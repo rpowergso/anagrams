@@ -1,10 +1,13 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
+from flask_session import Session
 import random
 import requests
 from game import check_dictionary, generate_tiles, same_root
 
 app = Flask(__name__)
 app.secret_key = 'something'
+app.config['SESSION_TYPE'] = 'filesystem'
+Session(app)
 
 @app.route('/')
 def home():
@@ -28,11 +31,13 @@ def get_tile():
     if 'tiles' not in session:
         tiles = generate_tiles()
         session['tiles'] = tiles
+        session.modified = True
     tiles = session['tiles']
     if not tiles:
         return jsonify({'tile': None, 'done': True})
     tile = tiles.pop(0)
     session['tiles'] = tiles
+    session.modified = True
     return jsonify({'tile': tile, 'done': False})
 
 @app.route('/check-word', methods=['POST'])

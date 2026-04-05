@@ -2,9 +2,14 @@
 {% block content %}
 <h1>Game Screen</h1>
 
+<a href="/homepage">Leave Game</a>
+<br><br>
+
+<p>Tiles remaining: <span id="tileCount">60</span></p>
 <div id="tilePool"></div>
 <br>
-<button onclick="drawTile()">Draw Tile</button>
+<button id="drawButton" onclick="drawTile()">Draw Tile</button>
+<p id="noMoreTiles" style="display:none;">No more tiles!</p>
 <br><br>
 
 <input type="text" id="wordInput" placeholder="Enter a word">
@@ -17,6 +22,7 @@
 <script>
     let activeTiles = [];
     let myWords = [];
+    let tilesDrawn = 0;
 
     function canMakeWord(word, tiles) {
         const available = [...tiles];
@@ -34,9 +40,6 @@
             if (!canMakeWord(word, combined)) continue;
 
             if (word.length === existingWord.length + 1 && word.endsWith('S') && word.slice(0, -1) === existingWord) continue;
-            if (word.endsWith(existingWord)) continue;
-            if (word.startsWith(existingWord)) continue;
-
             const stemResponse = await fetch('/check-stem', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -76,9 +79,12 @@
         const response = await fetch('/get-tile');
         const data = await response.json();
         if (data.done) {
-            alert('No more tiles!');
+            document.getElementById('noMoreTiles').style.display = 'block';
+            document.getElementById('drawButton').disabled = true;
             return;
         }
+        tilesDrawn++;
+        document.getElementById('tileCount').innerText = 60 - tilesDrawn;
         activeTiles.push(data.tile);
         renderTiles();
     }
