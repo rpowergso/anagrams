@@ -25,8 +25,14 @@ def generate_tiles():
 def check_dictionary(word):
     if len(word) < 3:
         return False
-    response = requests.get(f'https://api.dictionaryapi.dev/api/v2/entries/en/{word.lower()}')
-    return response.status_code == 200
+    response = requests.get(f'https://api.poocoo.app/api/v1/words-from-letters?letters={word.lower()}')
+    if response.status_code != 200:
+        return False
+    data = response.json()
+    all_words = []
+    for group in data['data']['wordGroups']:
+        all_words.extend(group['words'])
+    return word.lower() in all_words
 
 def same_root(word1, word2):
     return stemmer.stem(word1.lower()) == stemmer.stem(word2.lower())

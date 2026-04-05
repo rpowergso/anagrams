@@ -1,6 +1,5 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 from flask_session import Session
-import random
 import requests
 from game import check_dictionary, generate_tiles, same_root
 
