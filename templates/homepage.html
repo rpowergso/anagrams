@@ -1,0 +1,12 @@
+{% extends "layout.html" %}
+{% block content %}
+<h1>Welcome to Anagrams</h1>
+<h2>Select Difficulty</h2>
+<form method="post" action="/homepage">
+    <label><input type="radio" name="difficulty" value="easy"> Easy</label>
+    <label><input type="radio" name="difficulty" value="medium"> Medium</label>
+    <label><input type="radio" name="difficulty" value="hard"> Hard</label>
+    <br><br>
+    <button type="submit">Start Game</button>
+</form>
+{% endblock %}
