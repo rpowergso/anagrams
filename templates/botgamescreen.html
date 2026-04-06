@@ -1,0 +1,49 @@
+{% extends "layout.html" %}
+{% block content %}
+<h1>Player vs Bot</h1>
+<a href="/homepage">Leave Game</a>
+<br><br>
+<p>Difficulty: <strong>{{ difficulty|capitalize }}</strong></p>
+<p>Tiles remaining: <span id="tileCount">{{ tile_count }}</span></p>
+
+<p>Shared tile pool:</p>
+<div id="tilePool"></div>
+<br>
+<button id="playerDrawButton" onclick="drawTileForPlayer()">Draw Tile</button>
+
+<div style="display:flex; gap:40px; flex-wrap:wrap; margin-top:20px;">
+    <section style="flex:1; min-width:280px;">
+        <h2>Player</h2>
+        <input type="text" id="playerWordInput" placeholder="Enter a word">
+        <button onclick="checkPlayerWord()">Submit Word</button>
+        <p id="playerResult"></p>
+        <h3>Your Words</h3>
+        <div id="playerWords">No player words yet</div>
+    </section>
+
+    <section style="flex:1; min-width:280px;">
+        <h2>Bot</h2>
+        <p id="botStatus" style="display:none;">Bot is waiting...</p>
+        <h3>Bot Words</h3>
+        <div id="botWords">No bot words yet</div>
+        <br>
+        <button id="startBotButton" onclick="startBot()">Start Bot</button>
+    </section>
+</div>
+
+<script>
+    const TILE_COUNT = {{ tile_count }};
+    const BOT_DIFFICULTY = "{{ difficulty }}";
+    const AUTODRAW_INTERVAL_MS = {{ autodraw_interval }};
+    let activeTiles = [];
+    let playerWords = [];
+    let botWords = [];
+    let tilesDrawn = 0;
+    let botInterval = null;
+    let botBusy = false;
+    let botCancelId = 0;
+    let botRunning = false;
+</script>
+<script src="/static/js/game.js"></script>
+<script src="/static/js/bot.js"></script>
+{% endblock %}

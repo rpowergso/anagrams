@@ -1,28 +1,38 @@
-{% extends "layout.html" %}
-{% block content %}
-<h1>Game Screen</h1>
+    function toggleAutoDraw() {
+        if (autoDrawInterval) {
+            clearInterval(autoDrawInterval);
+            autoDrawInterval = null;
+            document.getElementById('autoDrawButton').innerText = 'Autodraw: Off';
+        } else {
+            autoDrawInterval = setInterval(drawTile, AUTODRAW_INTERVAL_MS);
+            document.getElementById('autoDrawButton').innerText = 'Autodraw: On';
+        }
+    }
 
-<a href="/homepage">Leave Game</a>
-<br><br>
+    function renderTilesTo(elementId, tiles) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.innerText = tiles.join(' ');
+        }
+    }
 
-<p>Tiles remaining: <span id="tileCount">60</span></p>
-<div id="tilePool"></div>
-<br>
-<button id="drawButton" onclick="drawTile()">Draw Tile</button>
-<p id="noMoreTiles" style="display:none;">No more tiles!</p>
-<br><br>
+    function renderWordsTo(elementId, words) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.innerText = words.length > 0 ? words.join(', ') : 'No words yet';
+        }
+    }
 
-<input type="text" id="wordInput" placeholder="Enter a word">
-<button onclick="checkWord()">Check Word</button>
-<p id="result"></p>
-
-<h3>My Words</h3>
-<div id="myWords"></div>
-
-<script>
-    let activeTiles = [];
-    let myWords = [];
-    let tilesDrawn = 0;
+    function removeWordFromTiles(word, tiles) {
+        const remaining = [...tiles];
+        for (const letter of word.split('')) {
+            const index = remaining.indexOf(letter);
+            if (index !== -1) {
+                remaining.splice(index, 1);
+            }
+        }
+        return remaining;
+    }
 
     function canMakeWord(word, tiles) {
         const available = [...tiles];
@@ -34,8 +44,8 @@
         return true;
     }
 
-    async function canStealWord(word, myWords, activeTiles) {
-        for (const existingWord of myWords) {
+    async function canStealWord(word, boardWords, activeTiles) {
+        for (const existingWord of boardWords) {
             const combined = [...existingWord.split(''), ...activeTiles];
             if (!canMakeWord(word, combined)) continue;
 
@@ -56,9 +66,14 @@
                     existingLetters.splice(fromExisting, 1);
                 } else {
                     const fromPool = available.indexOf(letter);
+                    if (fromPool === -1) {
+                        existingLetters.length = 1; // ensure failure
+                        break;
+                    }
                     available.splice(fromPool, 1);
                 }
             }
+            if (existingLetters.length > 0) continue;
             const usedFromPool = activeTiles.length - available.length;
             if (usedFromPool < 1) continue;
 
@@ -81,10 +96,16 @@
         if (data.done) {
             document.getElementById('noMoreTiles').style.display = 'block';
             document.getElementById('drawButton').disabled = true;
+            if (autoDrawInterval) {
+                clearInterval(autoDrawInterval);
+                autoDrawInterval = null;
+                document.getElementById('autoDrawButton').innerText = 'Autodraw: Off';
+                document.getElementById('autoDrawButton').disabled = true;
+            }
             return;
         }
         tilesDrawn++;
-        document.getElementById('tileCount').innerText = 60 - tilesDrawn;
+        document.getElementById('tileCount').innerText = TILE_COUNT - tilesDrawn;
         activeTiles.push(data.tile);
         renderTiles();
     }
@@ -146,5 +167,3 @@
 
         document.getElementById('result').innerText = 'Tiles are not there';
     }
-</script>
-{% endblock %}

@@ -1,12 +1,24 @@
 {% extends "layout.html" %}
 {% block content %}
 <h1>Welcome to Anagrams</h1>
-<h2>Select Difficulty</h2>
-<form method="post" action="/homepage">
+
+<h2>Solo</h2>
+<p>Play by yourself, no opponent.</p>
+<a href="/sologamescreen"><button>Play Solo</button></a>
+
+<h2>Bot</h2>
+<p>Play against the computer.</p>
+<form method="post" action="/botgamescreen">
     <label><input type="radio" name="difficulty" value="easy"> Easy</label>
     <label><input type="radio" name="difficulty" value="medium"> Medium</label>
     <label><input type="radio" name="difficulty" value="hard"> Hard</label>
+    <label><input type="radio" name="difficulty" value="custom"> Custom</label>
     <br><br>
-    <button type="submit">Start Game</button>
+    <button type="submit">Play vs Bot</button>
 </form>
+
+<h2>Multiplayer</h2>
+<p>Coming soon.</p>
+<button disabled>Play Multiplayer</button>
+
 {% endblock %}

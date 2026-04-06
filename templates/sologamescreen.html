@@ -1,0 +1,37 @@
+{% extends "layout.html" %}
+{% block content %}
+<h1>Game Screen</h1>
+
+<a href="/homepage">Leave Game</a>
+<br><br>
+
+<p>Tiles remaining: <span id="tileCount">{{ tile_count }}</span></p>
+<div id="tilePool"></div>
+<br>
+<button id="drawButton" onclick="drawTile()">Draw Tile</button>
+<button id="autoDrawButton" onclick="toggleAutoDraw()">Autodraw: Off</button>
+<p id="noMoreTiles" style="display:none;">No more tiles!</p>
+<br><br>
+
+<input type="text" id="wordInput" placeholder="Enter a word">
+<button onclick="checkWord()">Check Word</button>
+<p id="result"></p>
+
+<h3>My Words</h3>
+<div id="myWords"></div>
+
+<script>
+    const AUTODRAW_INTERVAL_MS = {{ autodraw_interval }};
+    const TILE_COUNT = {{ tile_count }};
+
+    let activeTiles = [];
+    let myWords = [];
+    let tilesDrawn = 0;
+    let autoDrawInterval = null;
+
+    document.getElementById('wordInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') checkWord();
+    });
+</script>
+<script src="/static/js/game.js"></script>
+{% endblock %}
