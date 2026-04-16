@@ -5,4 +5,3 @@ eventlet
 gunicorn
 wordfreq
 nltk
-git+https://github.com/fogleman/twl.git
