@@ -3,6 +3,5 @@ flask-socketio
 flask-session
 eventlet
 gunicorn
-twl
 wordfreq
 nltk
