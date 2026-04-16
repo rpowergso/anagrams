@@ -31,14 +31,50 @@ function toggleSoloAuto() {
 async function drawTile() {
     const data = await fetchTile();
     if (data.done) { 
-        clearInterval(soloInterval); 
+        clearInterval(soloInterval);
         const countdown = document.getElementById('solo-countdown');
-        if (countdown) countdown.innerText = "DONE";
+        if (countdown) countdown.innerText = "NO TILES LEFT";
+        showSoloGameOver();
         return; 
     }
     activeTiles.push(data.tile);
     renderTiles();
     if (soloAutoDraw) setSoloCountdown(AUTODRAW_INTERVAL_MS);
+}
+
+function showSoloGameOver() {
+    const score = parseInt(document.getElementById('playerTotalScore')?.innerText || 0);
+    
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+    `;
+    
+    modal.innerHTML = `
+        <div style="background: #1a252f; padding: 50px; border-radius: 20px; text-align: center; border: 3px solid #3498db;">
+            <h1 style="font-size: 3rem; margin-bottom: 20px; letter-spacing: 2px;">GAME OVER</h1>
+            <div style="font-size: 2rem; margin-bottom: 40px; color: #2ecc71; font-weight: bold;">
+                FINAL SCORE: ${score}
+            </div>
+            <div style="font-size: 1.1rem; margin-bottom: 40px; opacity: 0.8;">
+                Words Found: ${myWords.length}
+            </div>
+            <a href="/homepage" style="text-decoration: none;">
+                <button class="btn btn-green" style="padding: 15px 40px; font-size: 1.2rem;">BACK TO HOME</button>
+            </a>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
 }
 
 async function checkWord() {

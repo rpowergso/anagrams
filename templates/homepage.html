@@ -2,54 +2,84 @@
 {% block content %}
 <div style="text-align: center; padding: 50px;">
     <!-- The Big "Pretty" Title -->
-    <h1 style="font-size: 4.5rem; text-shadow: 0 8px 0 var(--tile-shadow); margin-bottom: 40px; letter-spacing: 4px;">ANAGRAMS</h1>
+    <h1 style="font-size: 4.5rem; text-shadow: 0 8px 0 var(--tile-shadow); margin-bottom: 60px; letter-spacing: 4px;">ANAGRAMS</h1>
     
-    <div class="menu-card">
-        <!-- SOLO MODE (The big blue button) -->
-        <a href="/sologamescreen" style="text-decoration: none;">
-            <button class="btn btn-blue" style="width: 100%; height: 65px; font-size: 1.4rem; margin-bottom: 30px; letter-spacing: 2px;">SOLO MODE</button>
-        </a>
+    <!-- 3-COLUMN LAYOUT -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 40px; max-width: 1400px; margin: 0 auto;">
         
-        <!-- MULTIPLAYER SECTION (Styled like the Bot section) -->
-        <div style="border-top: 2px solid rgba(255,255,255,0.1); padding-top: 25px; margin-bottom: 30px;">
-            <h3 style="letter-spacing: 3px; opacity: 0.8; margin-bottom: 20px; font-size: 0.9rem;">MULTIPLAYER</h3>
+        <!-- LEFT COLUMN: SOLO MODE -->
+        <div class="menu-card" style="background: rgba(52, 152, 219, 0.05); border: 2px solid rgba(52, 152, 219, 0.2);">
+            <h2 style="color: #3498db; letter-spacing: 2px; margin-bottom: 30px;">SOLO</h2>
+            <a href="/sologamescreen" style="text-decoration: none;">
+                <button class="btn btn-blue" style="width: 100%; height: 60px; font-size: 1.2rem; letter-spacing: 2px;">PLAY SOLO</button>
+            </a>
+            <p style="margin-top: 25px; opacity: 0.7; font-size: 0.9rem; line-height: 1.6;">Test your word-finding skills against the clock with unlimited tiles.</p>
+        </div>
+
+        <!-- MIDDLE COLUMN: MULTIPLAYER -->
+        <div class="menu-card" style="background: rgba(155, 89, 182, 0.05); border: 2px solid rgba(155, 89, 182, 0.2);">
+            <h2 style="color: #9b59b6; letter-spacing: 2px; margin-bottom: 30px;">MULTIPLAYER</h2>
             
             <!-- Create Room Button -->
             <a href="/create-room" style="text-decoration: none;">
-                <button class="btn btn-toggle" style="width: 100%; height: 50px; font-size: 1.1rem; margin-bottom: 15px; background: #9b59b6;">CREATE PRIVATE ROOM</button>
+                <button class="btn btn-toggle" style="width: 100%; height: 50px; font-size: 1rem; margin-bottom: 15px; background: #9b59b6;">CREATE ROOM</button>
             </a>
             
             <!-- Join Room Form -->
-            <form action="/join-room" method="POST" style="display: flex; gap: 10px;">
+            <form action="/join-room" method="POST" style="display: flex; flex-direction: column; gap: 12px;">
                 <input type="text" name="room_id" placeholder="ROOM CODE" 
-                       style="flex: 1; padding: 12px 20px; border-radius: 30px; border: 2px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.2); color: white; font-weight: bold; text-transform: uppercase; outline: none; text-align: center;">
-                <button type="submit" class="btn btn-green" style="padding: 0 25px; border-radius: 30px;">JOIN</button>
+                       style="width: 100%; padding: 12px 15px; border-radius: 8px; border: 2px solid rgba(155, 89, 182, 0.3); background: rgba(0,0,0,0.2); color: white; font-weight: bold; text-transform: uppercase; outline: none; text-align: center; font-size: 0.95rem;">
+                <button type="submit" class="btn btn-green" style="width: 100%; padding: 12px; border-radius: 8px;">JOIN ROOM</button>
             </form>
+            
+            <p style="margin-top: 20px; opacity: 0.7; font-size: 0.9rem; line-height: 1.6;">Challenge friends in real-time multiplayer matches.</p>
         </div>
 
-        <!-- BOT MODES (Restored exactly as you had it) -->
-        <div style="border-top: 2px solid rgba(255,255,255,0.1); padding-top: 25px;">
-            <h3 style="letter-spacing: 3px; opacity: 0.8; margin-bottom: 20px; font-size: 0.9rem;">PLAY VS BOT</h3>
-            <form method="post" action="/botgamescreen">
-                <button type="submit" name="difficulty" value="easy" class="btn btn-green diff-btn" style="background: #27ae60;">Easy</button>
-                <button type="submit" name="difficulty" value="medium" class="btn btn-green diff-btn" style="background: #f39c12;">Medium</button>
-                <button type="submit" name="difficulty" value="hard" class="btn btn-green diff-btn" style="background: #e74c3c;">Hard</button>
+        <!-- RIGHT COLUMN: BOT MODES -->
+        <div class="menu-card" style="background: rgba(231, 76, 60, 0.05); border: 2px solid rgba(231, 76, 60, 0.2);">
+            <h2 style="color: #e74c3c; letter-spacing: 2px; margin-bottom: 30px;">VS BOT</h2>
+            <form method="post" action="/botgamescreen" style="display: flex; flex-direction: column; gap: 12px;">
+                <button type="submit" name="difficulty" value="easy" class="btn btn-green" style="background: #27ae60; width: 100%; padding: 12px; border-radius: 8px;">EASY</button>
+                <button type="submit" name="difficulty" value="medium" class="btn btn-green" style="background: #f39c12; width: 100%; padding: 12px; border-radius: 8px;">MEDIUM</button>
+                <button type="submit" name="difficulty" value="hard" class="btn btn-green" style="background: #e74c3c; width: 100%; padding: 12px; border-radius: 8px;">HARD</button>
                 <input type="hidden" name="autodraw" value="off">
             </form>
+            <p style="margin-top: 20px; opacity: 0.7; font-size: 0.9rem; line-height: 1.6;">Test yourself against an AI opponent at various difficulty levels.</p>
         </div>
+
     </div>
 </div>
 
 <style>
-    /* Ensure the join input looks good alongside your buttons */
+    .menu-card {
+        padding: 40px 30px;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        backdrop-filter: blur(10px);
+    }
+
     input::placeholder {
         color: rgba(255,255,255,0.4);
         letter-spacing: 1px;
-        font-size: 0.8rem;
+        font-size: 0.85rem;
     }
+    
     input:focus {
         border-color: var(--player-accent) !important;
         background: rgba(0,0,0,0.4) !important;
+        box-shadow: 0 0 15px rgba(52, 152, 219, 0.3);
+    }
+
+    @media (max-width: 1024px) {
+        div[style*="grid-template-columns: 1fr 1fr 1fr"] {
+            grid-template-columns: 1fr 1fr !important;
+        }
+    }
+
+    @media (max-width: 768px) {
+        div[style*="grid-template-columns: 1fr 1fr 1fr"] {
+            grid-template-columns: 1fr !important;
+        }
     }
 </style>
 {% endblock %}

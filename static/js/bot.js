@@ -40,7 +40,13 @@ async function startBot() {
 async function botDrawTile() {
     if (!botRunning) return;
     const data = await fetchTile();
-    if (data.done) { stopBot('GAME OVER'); return; }
+    if (data.done) { 
+        // No more tiles - bot tries to find one more word
+        if (!botIsThinking) {
+            requestBotMove(true); // Final attempt
+        }
+        return; 
+    }
     activeTiles.push(data.tile);
     renderTiles();
     
@@ -60,7 +66,13 @@ async function botDrawTile() {
 
 async function drawTileForPlayer() {
     const data = await fetchTile();
-    if (data.done) return;
+    if (data.done) {
+        // No more tiles - player tries to find one more word, then bot final attempt
+        if (!botIsThinking && botRunning) {
+            setTimeout(() => requestBotMove(true), 500); // Bot final attempt
+        }
+        return;
+    }
     activeTiles.push(data.tile);
     renderTiles();
     botCancelId++; 
@@ -77,7 +89,7 @@ async function drawTileForPlayer() {
     if (input) input.focus();
 }
 
-async function requestBotMove() {
+async function requestBotMove(isFinalAttempt = false) {
     if (botIsThinking || !botRunning) return;
     botIsThinking = true;
     const currentCancelId = botCancelId;
@@ -108,8 +120,57 @@ async function requestBotMove() {
             botIsThinking = false;
         }, response.delay * 1000);
     } else {
+        // No move found
+        if (isFinalAttempt) {
+            endGameWithWinner();
+        }
         botIsThinking = false;
     }
+}
+
+function endGameWithWinner() {
+    stopBot('');
+    
+    const playerScore = parseInt(document.getElementById('playerTotalScore')?.innerText || 0);
+    const botScore = parseInt(document.getElementById('botTotalScore')?.innerText || 0);
+    
+    let resultText = '';
+    if (playerScore > botScore) {
+        resultText = `🎉 YOU WIN! ${playerScore} - ${botScore}`;
+    } else if (botScore > playerScore) {
+        resultText = `🤖 BOT WINS! ${botScore} - ${playerScore}`;
+    } else {
+        resultText = `🤝 TIE GAME! ${playerScore} - ${botScore}`;
+    }
+    
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+    `;
+    
+    modal.innerHTML = `
+        <div style="background: #1a252f; padding: 50px; border-radius: 20px; text-align: center; border: 3px solid #2ecc71;">
+            <h1 style="font-size: 3rem; margin-bottom: 20px; letter-spacing: 2px;">${resultText}</h1>
+            <div style="font-size: 1.3rem; margin-bottom: 40px; opacity: 0.8;">
+                <div style="margin: 10px;">YOUR WORDS: ${playerWords.length}</div>
+                <div style="margin: 10px;">BOT WORDS: ${botWords.length}</div>
+            </div>
+            <a href="/homepage" style="text-decoration: none;">
+                <button class="btn btn-green" style="padding: 15px 40px; font-size: 1.2rem;">BACK TO HOME</button>
+            </a>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
 }
 
 async function fetchBotMove() {

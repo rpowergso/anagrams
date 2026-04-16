@@ -4,6 +4,7 @@ from flask_socketio import emit, join_room
 from app import socketio
 from game import generate_tiles, check_dictionary, same_root
 from collections import Counter
+import time
 
 rooms = {}
 
@@ -159,6 +160,7 @@ def on_start(data):
     
     game['status'] = 'playing'
     game['tiles'] = generate_tiles(game['settings']['max_tiles'])
+    game['end_game_votes'] = {}  # Initialize end game votes
     emit('game_start', game, room=room)
 
 @socketio.on('draw_tile')
@@ -192,3 +194,49 @@ def on_draw(data):
         emit('update_board', game, room=room)
     else:
         emit('error_message', {'msg': 'No tiles left to draw!'}, room=room)
+
+@socketio.on('vote_end_game')
+def on_vote_end_game(data):
+    room = data['room']
+    game = rooms.get(room)
+    
+    if not game:
+        return
+    
+    # Initialize end game votes if not present
+    if 'end_game_votes' not in game:
+        game['end_game_votes'] = {}
+    
+    # Mark this player as voting to end
+    game['end_game_votes'][request.sid] = True
+    
+    # Check if 2/3 majority reached
+    total_players = len(game['players'])
+    votes_for_end = len(game['end_game_votes'])
+    votes_needed = (total_players * 2) // 3 + (1 if (total_players * 2) % 3 > 0 else 0)
+    
+    # Send vote update to all players
+    emit('end_game_vote', {
+        'votes': game['end_game_votes'],
+        'players': game['players'],
+        'votes_needed': votes_needed
+    }, room=room)
+    
+    # If 2/3 majority reached, start final countdown
+    if votes_for_end >= votes_needed:
+        # Start 10 second countdown, then end game
+        socketio.start_background_task(end_game_countdown, room, game)
+
+def end_game_countdown(room, game):
+    time.sleep(10)
+    
+    # Calculate final scores and announce winner
+    final_scores = {}
+    for sid, player in game['players'].items():
+        final_scores[sid] = player['score']
+    
+    game['status'] = 'ended'
+    socketio.emit('game_ended', {
+        'final_scores': final_scores,
+        'players': game['players']
+    }, room=room)

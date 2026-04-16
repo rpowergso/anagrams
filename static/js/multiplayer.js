@@ -3,6 +3,8 @@ let myUsername = "";
 let mySid = "";
 let isMyTurn = false;
 let drawTimerInterval = null;
+let endGameVotes = {}; // Track who voted to end the game
+let hasVotedToEnd = false; // Did I vote to end?
 
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Join logic
@@ -21,6 +23,24 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.on('connect', () => {
         mySid = socket.id;
     });
+});
+
+/* --- END GAME EVENTS --- */
+
+socket.on('end_game_vote', (data) => {
+    endGameVotes = data.votes;
+    const votesNeeded = Math.ceil(Object.keys(data.players).length * 2 / 3);
+    const votesReceived = Object.values(endGameVotes).filter(v => v).length;
+    updateEndGameUI(votesReceived, votesNeeded);
+    
+    if (votesReceived >= votesNeeded) {
+        // Start countdown to game end
+        showEndGameCountdown(data.players);
+    }
+});
+
+socket.on('game_ended', (data) => {
+    showGameOverScreen(data);
 });
 
 /* --- LOBBY EVENTS --- */
@@ -89,6 +109,10 @@ function startGame() {
 function drawTile() {
     // The server will validate if it's actually our turn
     socket.emit('draw_tile', { room: ROOM_ID });
+    
+    // Keep focus on the word input
+    const input = document.getElementById('wordInput');
+    if (input) input.focus();
 }
 
 function submitWord() {
@@ -155,6 +179,7 @@ function updateUI(data) {
     
     const turnIndicator = document.getElementById('turn-indicator');
     const drawBtn = document.getElementById('drawButton');
+    const endGameBtn = document.getElementById('endGameButton');
     
     if (turnIndicator) {
         const currentName = data.players[currentTurnSid].username;
@@ -162,18 +187,34 @@ function updateUI(data) {
         turnIndicator.style.color = isMyTurn ? "#2ecc71" : "#f1c40f";
     }
 
-    if (drawBtn) {
-        drawBtn.disabled = !isMyTurn;
-        // Visual "Lock" Feedback
-        if (isMyTurn) {
-            drawBtn.innerText = "DRAW TILE";
-            drawBtn.style.opacity = "1";
-            drawBtn.style.cursor = "pointer";
-        } else {
-            drawBtn.innerText = "LOCKED";
+    // Show end game button when no tiles left
+    if (data.tiles.length === 0) {
+        if (drawBtn) {
+            drawBtn.disabled = true;
+            drawBtn.innerText = "NO TILES LEFT";
             drawBtn.style.opacity = "0.5";
-            drawBtn.style.cursor = "not-allowed";
         }
+        if (endGameBtn) {
+            endGameBtn.style.display = 'inline-block';
+            endGameBtn.innerText = hasVotedToEnd ? "END GAME ✓" : "END GAME?";
+        }
+    } else {
+        if (drawBtn) {
+            drawBtn.disabled = !isMyTurn;
+            if (isMyTurn) {
+                drawBtn.innerText = "DRAW TILE";
+                drawBtn.style.opacity = "1";
+                drawBtn.style.cursor = "pointer";
+            } else {
+                drawBtn.innerText = "LOCKED";
+                drawBtn.style.opacity = "0.5";
+                drawBtn.style.cursor = "not-allowed";
+            }
+        }
+        if (endGameBtn) {
+            endGameBtn.style.display = 'none';
+        }
+        hasVotedToEnd = false;
     }
 
     resetTurnTimer(data.settings.draw_time);
@@ -244,4 +285,113 @@ function renderPlayers(players) {
         `;
         board.appendChild(section);
     }
+}
+
+function requestEndGame() {
+    hasVotedToEnd = true;
+    socket.emit('vote_end_game', { room: ROOM_ID });
+}
+
+function updateEndGameUI(votesReceived, votesNeeded) {
+    const endGameBtn = document.getElementById('endGameButton');
+    if (endGameBtn) {
+        endGameBtn.innerText = `END GAME (${votesReceived}/${votesNeeded})`;
+    }
+}
+
+function showEndGameCountdown(players) {
+    const modal = document.createElement('div');
+    modal.id = 'end-game-countdown';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.9);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 5000;
+    `;
+    
+    let countdown = 10;
+    modal.innerHTML = `
+        <h1 style="font-size: 3rem; margin-bottom: 30px; letter-spacing: 2px;">GAME ENDING IN</h1>
+        <div id="countdown-timer" style="font-size: 5rem; font-weight: bold; color: #e74c3c; margin-bottom: 50px;">${countdown}</div>
+        <p style="font-size: 1.2rem; opacity: 0.8;">Calculating final scores...</p>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    const countdownEl = document.getElementById('countdown-timer');
+    const countdownInterval = setInterval(() => {
+        countdown--;
+        if (countdownEl) countdownEl.innerText = countdown;
+        if (countdown <= 0) {
+            clearInterval(countdownInterval);
+            const gameModal = document.getElementById('end-game-countdown');
+            if (gameModal) gameModal.remove();
+        }
+    }, 1000);
+}
+
+function showGameOverScreen(data) {
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+    `;
+    
+    // Find winner
+    let winner = null;
+    let maxScore = -1;
+    let isTie = false;
+    const scores = Object.entries(data.final_scores).map(([sid, score]) => ({
+        username: data.players[sid].username,
+        score: score
+    }));
+    
+    for (const [sid, score] of Object.entries(data.final_scores)) {
+        if (score > maxScore) {
+            maxScore = score;
+            winner = data.players[sid].username;
+            isTie = false;
+        } else if (score === maxScore) {
+            isTie = true;
+        }
+    }
+    
+    const resultText = isTie 
+        ? `🤝 GAME OVER - TIE!` 
+        : `🏆 ${winner.toUpperCase()} WINS!`;
+    
+    const scoresHtml = scores.map(s => `
+        <div style="font-size: 1.2rem; margin: 10px; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 8px;">
+            ${s.username}: <span style="color: #2ecc71; font-weight: bold;">${s.score} points</span>
+        </div>
+    `).join('');
+    
+    modal.innerHTML = `
+        <div style="background: #1a252f; padding: 50px; border-radius: 20px; text-align: center; border: 3px solid #2ecc71; max-width: 600px;">
+            <h1 style="font-size: 3rem; margin-bottom: 30px; letter-spacing: 2px;">${resultText}</h1>
+            <div style="margin-bottom: 40px;">
+                ${scoresHtml}
+            </div>
+            <a href="/homepage" style="text-decoration: none;">
+                <button class="btn btn-green" style="padding: 15px 40px; font-size: 1.2rem;">BACK TO HOME</button>
+            </a>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
 }
