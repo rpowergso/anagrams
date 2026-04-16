@@ -145,9 +145,9 @@ def check_dictionary(word):
     if not word or len(word) < MIN_WORD_LENGTH: return False
     return twl.check(word.lower())
 
-def generate_tiles():
+def generate_tiles(count=TILE_COUNT):
     pool = []
-    for letter, count in LETTER_WEIGHTS.items():
-        pool.extend([letter] * count)
+    for letter, c in LETTER_WEIGHTS.items():
+        pool.extend([letter] * c)
     random.shuffle(pool)
-    return pool[:TILE_COUNT]
+    return pool[:count]

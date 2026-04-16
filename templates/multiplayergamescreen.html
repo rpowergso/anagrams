@@ -1,0 +1,138 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<!-- Pass variables from Flask to JS -->
+<script>
+    const ROOM_ID = "{{ room_id }}";
+</script>
+
+<!-- 1. THE LOBBY (Shown by default) -->
+<div id="lobby-container" style="max-width: 600px; margin: 40px auto; padding: 30px; background: var(--board-color); border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center;">
+    <h1 style="margin-bottom: 10px; letter-spacing: 2px;">WAITING ROOM</h1>
+    <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 10px; font-family: monospace; font-size: 1.5rem; color: #3498db; margin-bottom: 25px;">
+        CODE: <span style="color: white; font-weight: bold;">{{ room_id }}</span>
+    </div>
+
+    <!-- HOST ONLY SETTINGS -->
+    <div id="host-controls" style="display: none; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; margin-bottom: 25px; border: 1px dashed rgba(255,255,255,0.2);">
+        <h3 style="margin-top: 0; font-size: 0.9rem; color: #f1c40f;">HOST SETTINGS 👑</h3>
+        <div style="display: flex; justify-content: space-around; gap: 15px;">
+            <div style="flex: 1;">
+                <label style="display: block; font-size: 0.8rem; margin-bottom: 5px;">TOTAL TILES</label>
+                <input type="number" id="setting-tiles" value="60" min="20" max="100" onchange="updateSettings()" 
+                       style="width: 80%; padding: 8px; border-radius: 5px; border: none; text-align: center; font-weight: bold;">
+            </div>
+            <div style="flex: 1;">
+                <label style="display: block; font-size: 0.8rem; margin-bottom: 5px;">DRAW TIMER (S)</label>
+                <input type="number" id="setting-timer" value="7" min="3" max="20" onchange="updateSettings()"
+                       style="width: 80%; padding: 8px; border-radius: 5px; border: none; text-align: center; font-weight: bold;">
+            </div>
+        </div>
+    </div>
+
+    <!-- PLAYER LIST -->
+    <div style="text-align: left; margin-bottom: 30px;">
+        <h3 style="font-size: 1rem; opacity: 0.7; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px;">PLAYERS</h3>
+        <div id="player-list">
+            <!-- Players injected via JS -->
+            <p style="text-align: center; opacity: 0.5;">Connecting...</p>
+        </div>
+    </div>
+
+    <div style="display: flex; gap: 15px; justify-content: center;">
+        <a href="/homepage" class="btn btn-leave" style="padding: 12px 25px;">LEAVE</a>
+        <button id="ready-btn" class="btn btn-blue" onclick="toggleReady()" style="padding: 12px 40px;">READY UP</button>
+        <button id="start-btn" class="btn btn-green" onclick="startGame()" style="display: none; padding: 12px 40px;">START GAME</button>
+    </div>
+</div>
+
+<!-- 2. THE GAME CONTAINER (Hidden by default) -->
+<div id="game-container" style="display: none;">
+    <!-- Top Nav -->
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; background: rgba(0,0,0,0.3);">
+        <a href="/homepage" class="btn btn-leave" onclick="return confirm('Leave game?')">LEAVE</a>
+        
+        <div style="text-align: center;">
+            <div id="turn-indicator" style="font-weight: bold; font-size: 1.1rem; letter-spacing: 1px;">WAITING...</div>
+            <div style="font-size: 0.8rem; opacity: 0.8;">AUTO-DRAW IN: <span id="draw-timer" style="color: #e74c3c; font-weight: bold; font-size: 1.1rem;">-</span>s</div>
+        </div>
+
+        <div style="font-weight: bold;">
+            Tiles: <span id="tileCount">--</span>
+        </div>
+    </div>
+
+    <!-- Drawing Area -->
+    <div style="text-align: center; padding: 20px;">
+        <div id="tilePool" style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; min-height: 80px; margin-bottom: 20px;"></div>
+        <button class="btn btn-blue" id="drawButton" onclick="drawTile()" style="padding: 15px 50px; font-size: 1.2rem;" disabled>DRAW TILE</button>
+    </div>
+
+    <!-- Players Board -->
+    <div id="playersBoard" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 25px; padding: 20px 40px; padding-bottom: 120px;">
+        <!-- Player word cards injected here -->
+    </div>
+
+    <!-- Input Footer -->
+    <div style="position: fixed; bottom: 0; width: 100%; background: #1a252f; padding: 20px; display: flex; justify-content: center; gap: 15px; z-index: 1000; border-top: 2px solid rgba(255,255,255,0.1);">
+        <div style="position: relative;">
+            <input type="text" id="wordInput" placeholder="Type word..." 
+                   style="padding: 15px; border-radius: 30px; width: 400px; border: 3px solid transparent; font-size: 1.2rem; outline: none; background: #2c3e50; color: white;"
+                   autocomplete="off">
+            <div id="statusMessage" style="position: absolute; top: -25px; left: 20px; font-weight: bold; font-size: 0.9rem;"></div>
+        </div>
+        <button class="btn btn-green" onclick="submitWord()" style="padding: 0 30px; border-radius: 30px;">SUBMIT</button>
+    </div>
+</div>
+
+<!-- Libraries -->
+<script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+<script src="{{ url_for('static', filename='js/multiplayer.js') }}"></script>
+
+<style>
+    /* Styling for the Lobby Player List */
+    .lobby-player-item {
+        transition: transform 0.2s;
+        border-left: 5px solid transparent;
+    }
+    .lobby-player-item:hover {
+        transform: translateX(5px);
+    }
+    
+    /* Input styling for Host Settings */
+    #host-controls input {
+        background: #2c3e50;
+        color: white;
+        border: 1px solid rgba(255,255,255,0.2);
+    }
+    
+    /* Simple Animation for the Drawing Timer */
+    #draw-timer {
+        transition: all 0.3s;
+    }
+
+    #drawButton:disabled {
+        background: #7f8c8d !important; /* Grey color */
+        box-shadow: none !important;
+        transform: none !important;
+        filter: grayscale(1);
+        border: 2px solid rgba(0,0,0,0.2);
+    }
+
+    #drawButton {
+        transition: all 0.3s ease;
+    }
+
+    /* Keep word tiles looking consistent */
+    .word-block {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 2px;
+        background: rgba(0,0,0,0.2);
+        padding: 6px;
+        border-radius: 8px;
+    }
+</style>
+
+{% endblock %}
