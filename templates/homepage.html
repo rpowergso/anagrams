@@ -4,19 +4,10 @@
     <!-- The Big "Pretty" Title -->
     <h1 style="font-size: 4.5rem; text-shadow: 0 8px 0 var(--tile-shadow); margin-bottom: 60px; letter-spacing: 4px;">ANAGRAMS</h1>
     
-    <!-- 3-COLUMN LAYOUT -->
-    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 40px; max-width: 1400px; margin: 0 auto;">
+    <!-- 3-COLUMN LAYOUT: Multiplayer | Bot (Center) | Solo -->
+    <div style="display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 40px; max-width: 1400px; margin: 0 auto;">
         
-        <!-- LEFT COLUMN: SOLO MODE -->
-        <div class="menu-card" style="background: rgba(52, 152, 219, 0.05); border: 2px solid rgba(52, 152, 219, 0.2);">
-            <h2 style="color: #3498db; letter-spacing: 2px; margin-bottom: 30px;">SOLO</h2>
-            <a href="/sologamescreen" style="text-decoration: none;">
-                <button class="btn btn-blue" style="width: 100%; height: 60px; font-size: 1.2rem; letter-spacing: 2px;">PLAY SOLO</button>
-            </a>
-            <p style="margin-top: 25px; opacity: 0.7; font-size: 0.9rem; line-height: 1.6;">Test your word-finding skills against the clock with unlimited tiles.</p>
-        </div>
-
-        <!-- MIDDLE COLUMN: MULTIPLAYER -->
+        <!-- LEFT COLUMN: MULTIPLAYER -->
         <div class="menu-card" style="background: rgba(155, 89, 182, 0.05); border: 2px solid rgba(155, 89, 182, 0.2);">
             <h2 style="color: #9b59b6; letter-spacing: 2px; margin-bottom: 30px;">MULTIPLAYER</h2>
             
@@ -35,16 +26,25 @@
             <p style="margin-top: 20px; opacity: 0.7; font-size: 0.9rem; line-height: 1.6;">Challenge friends in real-time multiplayer matches.</p>
         </div>
 
-        <!-- RIGHT COLUMN: BOT MODES -->
-        <div class="menu-card" style="background: rgba(231, 76, 60, 0.05); border: 2px solid rgba(231, 76, 60, 0.2);">
-            <h2 style="color: #e74c3c; letter-spacing: 2px; margin-bottom: 30px;">VS BOT</h2>
+        <!-- CENTER COLUMN: BOT (LARGER) -->
+        <div class="menu-card" style="background: rgba(231, 76, 60, 0.05); border: 2px solid rgba(231, 76, 60, 0.2); transform: scale(1.05);">
+            <h2 style="color: #e74c3c; letter-spacing: 2px; margin-bottom: 30px; font-size: 1.4rem;">VS BOT</h2>
             <form method="post" action="/botgamescreen" style="display: flex; flex-direction: column; gap: 12px;">
-                <button type="submit" name="difficulty" value="easy" class="btn btn-green" style="background: #27ae60; width: 100%; padding: 12px; border-radius: 8px;">EASY</button>
-                <button type="submit" name="difficulty" value="medium" class="btn btn-green" style="background: #f39c12; width: 100%; padding: 12px; border-radius: 8px;">MEDIUM</button>
-                <button type="submit" name="difficulty" value="hard" class="btn btn-green" style="background: #e74c3c; width: 100%; padding: 12px; border-radius: 8px;">HARD</button>
+                <button type="submit" name="difficulty" value="easy" class="btn btn-green" style="background: #27ae60; width: 100%; padding: 14px; border-radius: 8px; font-size: 1.05rem;">EASY</button>
+                <button type="submit" name="difficulty" value="medium" class="btn btn-green" style="background: #f39c12; width: 100%; padding: 14px; border-radius: 8px; font-size: 1.05rem;">MEDIUM</button>
+                <button type="submit" name="difficulty" value="hard" class="btn btn-green" style="background: #e74c3c; width: 100%; padding: 14px; border-radius: 8px; font-size: 1.05rem;">HARD</button>
                 <input type="hidden" name="autodraw" value="off">
             </form>
             <p style="margin-top: 20px; opacity: 0.7; font-size: 0.9rem; line-height: 1.6;">Test yourself against an AI opponent at various difficulty levels.</p>
+        </div>
+
+        <!-- RIGHT COLUMN: SOLO -->
+        <div class="menu-card" style="background: rgba(52, 152, 219, 0.05); border: 2px solid rgba(52, 152, 219, 0.2);">
+            <h2 style="color: #3498db; letter-spacing: 2px; margin-bottom: 30px;">SOLO</h2>
+            <a href="/sologamescreen" style="text-decoration: none;">
+                <button class="btn btn-blue" style="width: 100%; height: 60px; font-size: 1.2rem; letter-spacing: 2px;">PLAY SOLO</button>
+            </a>
+            <p style="margin-top: 25px; opacity: 0.7; font-size: 0.9rem; line-height: 1.6;">Test your word-finding skills against the clock with unlimited tiles.</p>
         </div>
 
     </div>
@@ -71,13 +71,16 @@
     }
 
     @media (max-width: 1024px) {
-        div[style*="grid-template-columns: 1fr 1fr 1fr"] {
+        div[style*="grid-template-columns: 1fr 1.2fr 1fr"] {
             grid-template-columns: 1fr 1fr !important;
+        }
+        .menu-card {
+            transform: scale(1) !important;
         }
     }
 
     @media (max-width: 768px) {
-        div[style*="grid-template-columns: 1fr 1fr 1fr"] {
+        div[style*="grid-template-columns: 1fr 1.2fr 1fr"] {
             grid-template-columns: 1fr !important;
         }
     }

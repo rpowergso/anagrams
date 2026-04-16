@@ -1,7 +1,7 @@
 {% extends "layout.html" %}
 {% block content %}
 <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; background: rgba(0,0,0,0.3);">
-    <a href="/homepage" class="btn btn-leave">LEAVE GAME</a>
+    <button class="btn btn-leave" onclick="confirmLeaveGame()">LEAVE GAME</button>
     <div id="solo-countdown" style="font-family: monospace; color: #3498db; font-weight: bold; font-size: 1.4rem;">READY</div>
     <div>Tiles: <span id="tileCount">{{ tile_count }}</span></div>
 </div>

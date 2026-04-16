@@ -166,8 +166,8 @@ def on_start(data):
         emit('error_message', {'msg': 'Only the host can start the game!'}, room=request.sid)
         return
     
-    # Check if everyone (except host maybe) is ready
-    all_ready = all(p['ready'] for sid, p in game['players'].items() if sid != game['host_sid'])
+    # Check if EVERYONE is ready (including host)
+    all_ready = all(p['ready'] for sid, p in game['players'].items())
     if not all_ready:
         emit('error_message', {'msg': 'Not everyone is ready!'}, room=request.sid)
         return

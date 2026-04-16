@@ -118,3 +118,34 @@ async function checkWord() {
         }
     }
 }
+
+function confirmLeaveGame() {
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+    `;
+    
+    modal.innerHTML = `
+        <div style="background: #1a252f; padding: 40px; border-radius: 20px; text-align: center; border: 3px solid #e74c3c; max-width: 400px;">
+            <h1 style="font-size: 1.8rem; margin-bottom: 25px; letter-spacing: 2px;">LEAVE GAME?</h1>
+            <p style="font-size: 1rem; opacity: 0.8; margin-bottom: 30px;">Are you sure you want to leave this game?</p>
+            <div style="display: flex; gap: 15px; justify-content: center;">
+                <button class="btn btn-leave" onclick="document.querySelector('div[style*=\\'z-index: 10000\\']').remove()" style="padding: 12px 30px;">CANCEL</button>
+                <a href="/homepage" style="text-decoration: none;">
+                    <button class="btn btn-green" style="padding: 12px 30px; background: #e74c3c;">LEAVE</button>
+                </a>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+}
