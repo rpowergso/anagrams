@@ -1,24 +1,20 @@
 {% extends "layout.html" %}
 {% block content %}
-<h1>Welcome to Anagrams</h1>
-
-<h2>Solo</h2>
-<p>Play by yourself, no opponent.</p>
-<a href="/sologamescreen"><button>Play Solo</button></a>
-
-<h2>Bot</h2>
-<p>Play against the computer.</p>
-<form method="post" action="/botgamescreen">
-    <label><input type="radio" name="difficulty" value="easy"> Easy</label>
-    <label><input type="radio" name="difficulty" value="medium"> Medium</label>
-    <label><input type="radio" name="difficulty" value="hard"> Hard</label>
-    <label><input type="radio" name="difficulty" value="custom"> Custom</label>
-    <br><br>
-    <button type="submit">Play vs Bot</button>
-</form>
-
-<h2>Multiplayer</h2>
-<p>Coming soon.</p>
-<button disabled>Play Multiplayer</button>
-
+<div style="text-align: center; padding: 50px;">
+    <h1 style="font-size: 4.5rem; text-shadow: 0 8px 0 var(--tile-shadow); margin-bottom: 40px;">ANAGRAMS</h1>
+    
+    <div class="menu-card">
+        <a href="/sologamescreen"><button class="btn btn-blue" style="width: 100%; height: 60px; font-size: 1.4rem; margin-bottom: 25px;">SOLO MODE</button></a>
+        
+        <div style="border-top: 2px solid rgba(255,255,255,0.1); padding-top: 20px;">
+            <h3 style="letter-spacing: 2px; opacity: 0.8; margin-bottom: 15px;">PLAY VS BOT</h3>
+            <form method="post" action="/botgamescreen">
+                <button type="submit" name="difficulty" value="easy" class="btn btn-green diff-btn" style="background: #27ae60;">Easy</button>
+                <button type="submit" name="difficulty" value="medium" class="btn btn-green diff-btn" style="background: #f39c12;">Medium</button>
+                <button type="submit" name="difficulty" value="hard" class="btn btn-green diff-btn" style="background: #e74c3c;">Hard</button>
+                <input type="hidden" name="autodraw" value="off">
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}

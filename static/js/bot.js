@@ -1,200 +1,115 @@
-function setBotStatus(message) {
-    const status = document.getElementById('botStatus');
-    if (status) {
-        status.innerText = message;
-    }
+let botIsThinking = false;
+let countdownInterval = null;
+let autoDrawMode = false; 
+
+function setCountdown(ms) {
+    const display = document.getElementById('countdown-display');
+    if (!display) return;
+    clearInterval(countdownInterval);
+    if (ms <= 0) { display.innerText = "READY"; return; }
+    let remaining = ms;
+    countdownInterval = setInterval(() => {
+        remaining -= 100;
+        display.innerText = `NEXT DRAW: ${(remaining / 1000).toFixed(1)}s`;
+        if (remaining <= 0) { clearInterval(countdownInterval); display.innerText = "DRAWING..."; }
+    }, 100);
 }
 
-function renderPlayerWords() {
-    renderWordsTo('playerWords', playerWords);
-}
-
-function renderBotWords() {
-    renderWordsTo('botWords', botWords);
-}
-
-function updateTileCount() {
-    const count = document.getElementById('tileCount');
-    if (count) {
-        count.innerText = TILE_COUNT - tilesDrawn;
-    }
-}
-
-function setPlayerResult(message) {
-    const result = document.getElementById('playerResult');
-    if (result) {
-        result.innerText = message;
-    }
-}
-
-function disableDrawButtons() {
-    const playerButton = document.getElementById('playerDrawButton');
-    if (playerButton) playerButton.disabled = true;
-    const botButton = document.getElementById('startBotButton');
-    if (botButton) botButton.disabled = true;
-}
-
-function clearBotTimers() {
-    if (botInterval) {
+function toggleAutoDraw() {
+    autoDrawMode = !autoDrawMode;
+    const btn = document.getElementById('autoDrawBtn');
+    if (btn) btn.innerText = `AUTODRAW: ${autoDrawMode ? 'ON' : 'OFF'}`;
+    
+    if (autoDrawMode) {
+        botInterval = setInterval(botDrawTile, AUTODRAW_INTERVAL_MS);
+        setCountdown(AUTODRAW_INTERVAL_MS);
+    } else {
         clearInterval(botInterval);
         botInterval = null;
+        setCountdown(0);
     }
 }
 
-function stopBot(message) {
-    botRunning = false;
-    clearBotTimers();
-    setBotStatus(message);
+async function startBot() {
+    botRunning = true;
+    if (typeof START_AUTODRAW_INITIALLY !== 'undefined' && START_AUTODRAW_INITIALLY === "on") {
+        toggleAutoDraw(); 
+    }
 }
 
-async function fetchTile() {
-    const response = await fetch('/get-tile');
-    const data = await response.json();
-    if (data.done) {
-        disableDrawButtons();
-        setBotStatus('No more tiles to draw.');
-        return { done: true };
+async function botDrawTile() {
+    if (!botRunning) return;
+    const data = await fetchTile();
+    if (data.done) { stopBot('GAME OVER'); return; }
+    activeTiles.push(data.tile);
+    renderTiles();
+    
+    // Bot scans immediately when tile hits pool
+    requestBotMove();
+    
+    if (autoDrawMode) {
+        setCountdown(AUTODRAW_INTERVAL_MS);
+    } else {
+        clearInterval(botInterval);
+        botInterval = null;
+        setCountdown(0);
+        const drawBtn = document.getElementById('playerDrawButton');
+        if (drawBtn) drawBtn.disabled = false;
     }
-
-    tilesDrawn++;
-    updateTileCount();
-    return { done: false, tile: data.tile };
 }
 
 async function drawTileForPlayer() {
     const data = await fetchTile();
-    if (data.done) {
-        setPlayerResult('No more tiles to draw.');
-        return;
-    }
+    if (data.done) return;
     activeTiles.push(data.tile);
     renderTiles();
-    botCancelId++;
-}
+    botCancelId++; 
 
-function cancelBotPendingActions() {
-    botCancelId++;
-}
-
-    let isChecking = false;
-
-async function checkPlayerWord() {
-    if (isChecking) return;
-    isChecking = true;
-
+    if (!autoDrawMode) {
+        const drawBtn = document.getElementById('playerDrawButton');
+        if (drawBtn) drawBtn.disabled = true;
+        setCountdown(AUTODRAW_INTERVAL_MS);
+        setTimeout(botDrawTile, AUTODRAW_INTERVAL_MS);
+    }
+    
+    // Keep focus on input
     const input = document.getElementById('playerWordInput');
-    const word = input.value.toUpperCase().trim();
-
-    if (word.length < 3) {
-        setPlayerResult('Word must be at least 3 letters');
-        isChecking = false;
-        return;
-    }
-
-    if (canMakeWord(word, activeTiles)) {
-        const response = await fetch('/check-word', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ word: word })
-        });
-        const data = await response.json();
-        if (data.valid) {
-            activeTiles = removeWordFromTiles(word, activeTiles);
-            playerWords.push(word);
-            renderTiles();
-            renderPlayerWords();
-            input.value = '';
-            setPlayerResult('Valid!');
-            cancelBotPendingActions();
-        } else {
-            setPlayerResult('Not a word');
-        }
-        isChecking = false;
-        return;
-    }
-
-    const steal = await canStealWord(word, [...botWords, ...playerWords], activeTiles);
-    if (steal) {
-        const response = await fetch('/check-word', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ word: word })
-        });
-        const data = await response.json();
-        if (data.valid) {
-            const stolenUpper = steal.stolenWord.toUpperCase();
-            if (botWords.map(w => w.toUpperCase()).includes(stolenUpper)) {
-                botWords = botWords.filter(w => w.toUpperCase() !== stolenUpper);
-            } else {
-                playerWords = playerWords.filter(w => w.toUpperCase() !== stolenUpper);
-            }
-            activeTiles = steal.newActiveTiles;
-            playerWords.push(word);
-            renderTiles();
-            renderPlayerWords();
-            renderBotWords();
-            input.value = '';
-            setPlayerResult(`Stole ${steal.stolenWord}!`);
-            cancelBotPendingActions();
-        } else {
-            setPlayerResult('Not a word');
-        }
-        isChecking = false;
-        return;
-    }
-
-    setPlayerResult('Tiles are not there');
-    isChecking = false;
+    if (input) input.focus();
 }
 
-async function startBot() {
-    if (botRunning) return;
-    botRunning = true;
-    const button = document.getElementById('startBotButton');
-    if (button) button.disabled = true;
-    setBotStatus('Bot starting...');
-    botInterval = setInterval(botCycle, AUTODRAW_INTERVAL_MS);
-    await botCycle();
-}
-
-async function botCycle() {
-    if (!botRunning || botBusy) return;
-    botBusy = true;
-    const cycleId = botCancelId;
-
-    const data = await fetchTile();
-    if (data.done) {
-        stopBot('Bot finished: no more tiles.');
-        botBusy = false;
+async function requestBotMove() {
+    if (botIsThinking || !botRunning) return;
+    botIsThinking = true;
+    const currentCancelId = botCancelId;
+    
+    const response = await fetchBotMove();
+    
+    // Safety check if state changed while waiting for fetch
+    if (currentCancelId !== botCancelId || !botRunning) {
+        botIsThinking = false;
         return;
     }
 
-    activeTiles.push(data.tile);
-    renderTiles();
+    if (response.found) {
+        // --- DEBUG INFO ---
+        console.group(`%cBot Move: ${response.word}`, "color: #e67e22; font-weight: bold;");
+        console.log(`Delay: ${response.delay}s`);
+        console.log(`Zipf Frequency: ${response.debug.chosen_freq}`);
+        console.log(`Candidates considered: ${response.debug.considered_count}`);
+        console.log("Top 15 words found by bot brain:");
+        console.table(response.debug.top_candidates);
+        console.groupEnd();
+        // ------------------
 
-    if (cycleId !== botCancelId) {
-        botBusy = false;
-        return;
-    }
-
-    const move = await fetchBotMove();
-    if (cycleId !== botCancelId) {
-        botBusy = false;
-        return;
-    }
-
-    if (move.found) {
         setTimeout(() => {
-            if (cycleId === botCancelId) {
-                applyBotMove(move);
-                renderTiles();
-                renderBotWords();
-                renderPlayerWords();
+            if (currentCancelId === botCancelId && botRunning) {
+                applyBotMove(response);
             }
-        }, move.delay * 1000);
+            botIsThinking = false;
+        }, response.delay * 1000);
+    } else {
+        botIsThinking = false;
     }
-
-    botBusy = false;
 }
 
 async function fetchBotMove() {
@@ -202,7 +117,7 @@ async function fetchBotMove() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            activeTiles: activeTiles,
+            activeTiles,
             boardWords: [...playerWords, ...botWords],
             difficulty: BOT_DIFFICULTY
         })
@@ -211,32 +126,90 @@ async function fetchBotMove() {
 }
 
 function applyBotMove(move) {
-    const word = move.word.toUpperCase();
-    activeTiles = removeWordFromTiles(word, activeTiles);
-
     if (move.source_word) {
-        const source = move.source_word.toUpperCase();
-        if (playerWords.map(w => w.toUpperCase()).includes(source)) {
-            playerWords = playerWords.filter(w => w.toUpperCase() !== source);
-        } else {
-            botWords = botWords.filter(w => w.toUpperCase() !== source);
-        }
+        const src = move.source_word.toUpperCase();
+        // Remove from whichever list it was in
+        playerWords = playerWords.filter(w => w.toUpperCase() !== src);
+        botWords = botWords.filter(w => w.toUpperCase() !== src);
+        setBotStatus(`Bot STOLE "${src}" to make "${move.word}"!`);
+    } else {
+        setBotStatus(`Bot played "${move.word}"`);
     }
 
-    botWords.push(word);
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    renderPlayerWords();
-    renderBotWords();
-    renderTiles();
-    const input = document.getElementById('playerWordInput');
-    if (input) {
-        input.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                checkPlayerWord();
-            }
+    if (move.pool_letters) {
+        move.pool_letters.forEach(l => {
+            const i = activeTiles.findIndex(t => t.toUpperCase() === l.toUpperCase());
+            if (i !== -1) activeTiles.splice(i, 1);
         });
     }
-});
+    botWords.push(move.word.toUpperCase());
+    renderTiles(); 
+    renderBotWords(); 
+    renderPlayerWords(); 
+    
+    // Check for a combo play immediately
+    setTimeout(requestBotMove, 500); 
+}
+
+function stopBot(msg) {
+    botRunning = false;
+    clearInterval(botInterval);
+    clearInterval(countdownInterval);
+    setBotStatus(msg);
+}
+
+function setBotStatus(msg) {
+    const el = document.getElementById('botStatus');
+    if (el) {
+        el.innerText = msg;
+        setTimeout(() => { if(el.innerText === msg) el.innerText = ''; }, 3500);
+    }
+}
+
+async function checkPlayerWord() {
+    const input = document.getElementById('playerWordInput');
+    const word = input.value.toUpperCase().trim();
+    if (word.length < 3) return;
+
+    if (canMakeWord(word, activeTiles)) {
+        const response = await fetch('/check-word', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ word })
+        });
+        const data = await response.json();
+        if (data.valid) {
+            activeTiles = removeWordFromTiles(word, activeTiles);
+            playerWords.push(word);
+            renderTiles();
+            renderPlayerWords();
+            input.value = '';
+            botCancelId++; 
+            requestBotMove();
+        }
+    } else {
+        const steal = await canStealWord(word, [...botWords, ...playerWords], activeTiles);
+        if (steal) {
+            const response = await fetch('/check-word', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ word })
+            });
+            const data = await response.json();
+            if (data.valid) {
+                const stolenUpper = steal.stolenWord.toUpperCase();
+                playerWords = playerWords.filter(w => w.toUpperCase() !== stolenUpper);
+                botWords = botWords.filter(w => w.toUpperCase() !== stolenUpper);
+                
+                activeTiles = steal.newActiveTiles;
+                playerWords.push(word);
+                renderTiles();
+                renderPlayerWords();
+                renderBotWords();
+                input.value = '';
+                botCancelId++;
+                requestBotMove();
+            }
+        }
+    }
+}

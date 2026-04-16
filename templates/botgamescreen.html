@@ -1,49 +1,59 @@
 {% extends "layout.html" %}
 {% block content %}
-<h1>Player vs Bot</h1>
-<a href="/homepage">Leave Game</a>
-<br><br>
-<p>Difficulty: <strong>{{ difficulty|capitalize }}</strong></p>
-<p>Tiles remaining: <span id="tileCount">{{ tile_count }}</span></p>
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; background: rgba(0,0,0,0.3);">
+    <a href="/homepage" class="btn btn-leave">LEAVE GAME</a>
+    <div id="countdown-display" style="font-family: monospace; color: #2ecc71; font-weight: bold; font-size: 1.4rem;">READY</div>
+    <div>Tiles: <span id="tileCount">{{ tile_count }}</span></div>
+</div>
 
-<p>Shared tile pool:</p>
-<div id="tilePool"></div>
-<br>
-<button id="playerDrawButton" onclick="drawTileForPlayer()">Draw Tile</button>
+<div style="text-align: center; padding: 30px;">
+    <div id="tilePool" style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; min-height: 100px; margin-bottom: 30px;"></div>
+    <button class="btn btn-blue" id="playerDrawButton" onclick="drawTileForPlayer()">DRAW TILE</button>
+    <button class="btn btn-toggle" id="autoDrawBtn" onclick="toggleAutoDraw()">AUTODRAW: OFF</button>
+    <p id="botStatus" style="height: 1.5rem; color: var(--bot-accent); font-weight: bold; margin-top: 10px;"></p>
+</div>
 
-<div style="display:flex; gap:40px; flex-wrap:wrap; margin-top:20px;">
-    <section style="flex:1; min-width:280px;">
-        <h2>Player</h2>
-        <input type="text" id="playerWordInput" placeholder="Enter a word">
-        <button onclick="checkPlayerWord()">Submit Word</button>
-        <p id="playerResult"></p>
-        <h3>Your Words</h3>
-        <div id="playerWords">No player words yet</div>
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; padding: 0 40px; padding-bottom: 120px;">
+    <section>
+        <div class="score-badge" id="playerTotalScore">0</div>
+        <h3 style="border-bottom: 2px solid var(--player-accent); display: inline-block;">PLAYER</h3>
+        <div id="playerWords" class="words-container"></div> <!-- Added class -->
     </section>
-
-    <section style="flex:1; min-width:280px;">
-        <h2>Bot</h2>
-        <p id="botStatus" style="display:none;">Bot is waiting...</p>
-        <h3>Bot Words</h3>
-        <div id="botWords">No bot words yet</div>
-        <br>
-        <button id="startBotButton" onclick="startBot()">Start Bot</button>
+    <section style="text-align: right;">
+        <div class="score-badge" id="botTotalScore" style="color: var(--bot-accent);">0</div>
+        <h3 style="border-bottom: 2px solid var(--bot-accent); display: inline-block;">BOT ({{ difficulty|upper }})</h3>
+        <div id="botWords" class="words-container" style="justify-content: flex-end;"></div> <!-- Added class -->
     </section>
+</div>
+
+<div style="position: fixed; bottom: 0; width: 100%; background: #1a252f; padding: 20px; display: flex; justify-content: center; gap: 15px; z-index: 1000;">
+    <input type="text" id="playerWordInput" placeholder="Type word..." style="padding: 15px; border-radius: 30px; width: 350px; border: 3px solid transparent; font-size: 1.2rem; transition: all 0.2s;" onfocus="this.style.borderColor='#2ecc71'; this.style.boxShadow='0 0 15px rgba(46,204,113,0.5)';" onblur="this.style.borderColor='transparent'; this.style.boxShadow='none';">
+    <button class="btn btn-green" onclick="checkPlayerWord()">SUBMIT</button>
+    <div id="playerResult" style="align-self: center; font-weight: bold; margin-left: 15px;"></div>
 </div>
 
 <script>
     const TILE_COUNT = {{ tile_count }};
     const BOT_DIFFICULTY = "{{ difficulty }}";
     const AUTODRAW_INTERVAL_MS = {{ autodraw_interval }};
-    let activeTiles = [];
-    let playerWords = [];
+    const START_AUTODRAW_INITIALLY = "{{ autodraw_mode }}" === "on";
+    
+    let activeTiles = []; 
+    let playerWords = []; 
     let botWords = [];
-    let tilesDrawn = 0;
-    let botInterval = null;
-    let botBusy = false;
-    let botCancelId = 0;
+    let tilesDrawn = 0; 
+    let botInterval = null; 
+    let botCancelId = 0; 
     let botRunning = false;
+    
+    window.onload = () => { 
+        renderTiles(); 
+        startBot(); 
+    };
+
+    const input = document.getElementById('playerWordInput');
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') checkPlayerWord(); });
 </script>
-<script src="/static/js/game.js"></script>
+<script src="/static/js/gamefunctions.js"></script>
 <script src="/static/js/bot.js"></script>
 {% endblock %}

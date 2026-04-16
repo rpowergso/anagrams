@@ -1,37 +1,40 @@
 {% extends "layout.html" %}
 {% block content %}
-<h1>Game Screen</h1>
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; background: rgba(0,0,0,0.3);">
+    <a href="/homepage" class="btn btn-leave">LEAVE GAME</a>
+    <div id="solo-countdown" style="font-family: monospace; color: #3498db; font-weight: bold; font-size: 1.4rem;">READY</div>
+    <div>Tiles: <span id="tileCount">{{ tile_count }}</span></div>
+</div>
 
-<a href="/homepage">Leave Game</a>
-<br><br>
+<div style="text-align: center; padding: 30px;">
+    <div id="tilePool" style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; min-height: 100px; margin-bottom: 30px;"></div>
+    <button class="btn btn-blue" onclick="drawTile()">DRAW TILE</button>
+    <button class="btn btn-toggle" id="soloAutoBtn" onclick="toggleSoloAuto()">AUTODRAW: OFF</button>
+</div>
 
-<p>Tiles remaining: <span id="tileCount">{{ tile_count }}</span></p>
-<div id="tilePool"></div>
-<br>
-<button id="drawButton" onclick="drawTile()">Draw Tile</button>
-<button id="autoDrawButton" onclick="toggleAutoDraw()">Autodraw: Off</button>
-<p id="noMoreTiles" style="display:none;">No more tiles!</p>
-<br><br>
+<div style="padding: 0 40px; padding-bottom: 120px;">
+    <div class="score-badge" id="playerTotalScore">0</div>
+    <h3 style="border-bottom: 2px solid var(--player-accent); display: inline-block;">MY WORDS</h3>
+    <div id="myWords"></div> <!-- SOLO WORDS GO HERE -->
+</div>
 
-<input type="text" id="wordInput" placeholder="Enter a word">
-<button onclick="checkWord()">Check Word</button>
-<p id="result"></p>
-
-<h3>My Words</h3>
-<div id="myWords"></div>
+<div style="position: fixed; bottom: 0; width: 100%; background: #1a252f; padding: 20px; display: flex; justify-content: center; gap: 15px; z-index: 1000;">
+    <input type="text" id="wordInput" placeholder="Type word..." style="padding: 15px; border-radius: 30px; width: 350px; border: none; font-size: 1.2rem;">
+    <button class="btn btn-green" onclick="checkWord()">SUBMIT</button>
+    <div id="result" style="align-self: center; font-weight: bold; margin-left: 15px;"></div>
+</div>
 
 <script>
     const AUTODRAW_INTERVAL_MS = {{ autodraw_interval }};
     const TILE_COUNT = {{ tile_count }};
-
-    let activeTiles = [];
-    let myWords = [];
+    let activeTiles = []; 
+    let myWords = []; 
     let tilesDrawn = 0;
-    let autoDrawInterval = null;
 
-    document.getElementById('wordInput').addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') checkWord();
-    });
+    window.onload = () => { renderTiles(); };
+    const input = document.getElementById('wordInput');
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') checkWord(); });
 </script>
-<script src="/static/js/game.js"></script>
+<script src="/static/js/gamefunctions.js"></script>
+<script src="/static/js/sologame.js"></script>
 {% endblock %}
