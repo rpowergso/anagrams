@@ -1,7 +1,7 @@
 # multiplayer.py
 from flask import request
 from flask_socketio import emit, join_room
-from __main__ import socketio
+from app import socketio
 from game import generate_tiles, check_dictionary, same_root
 from collections import Counter
 

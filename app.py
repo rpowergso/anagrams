@@ -1,3 +1,7 @@
+import eventlet
+eventlet.monkey_patch()
+
+import os
 import uuid
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 from flask_session import Session
