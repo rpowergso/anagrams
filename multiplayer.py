@@ -7,6 +7,14 @@ from collections import Counter
 
 rooms = {}
 
+def can_make_word(target_word, source_letters):
+    target_count = Counter(target_word.upper())
+    source_count = Counter(source_letters)
+    for char, count in target_count.items():
+        if source_count[char] < count:
+            return False
+    return True
+
 @socketio.on('join')
 def on_join(data):
     room = data['room']
@@ -15,7 +23,7 @@ def on_join(data):
     
     if room not in rooms:
         rooms[room] = {
-            'status': 'lobby', # lobby, playing
+            'status': 'lobby',
             'host_sid': request.sid,
             'settings': {'max_tiles': 60, 'draw_time': 7},
             'tiles': [],
@@ -26,8 +34,6 @@ def on_join(data):
         }
     
     game = rooms[room]
-    
-    # Don't let people join if game already started (optional)
     if game['status'] == 'playing':
         emit('error_message', {'msg': 'Game already in progress'}, room=request.sid)
         return
@@ -39,9 +45,81 @@ def on_join(data):
         'ready': False,
         'is_host': (request.sid == game['host_sid'])
     }
-    game['player_order'].append(request.sid)
+    if request.sid not in game['player_order']:
+        game['player_order'].append(request.sid)
     
     emit('lobby_update', game, room=room)
+
+@socketio.on('claim_word')
+def on_claim_word(data):
+    room = data['room']
+    word = data['word'].upper().strip()
+    sid = request.sid
+    game = rooms.get(room)
+
+    # Better error handling with feedback
+    if not game:
+        emit('error_message', {'msg': 'Game room not found!'}, room=sid)
+        return
+    
+    if game['status'] != 'playing':
+        emit('error_message', {'msg': 'Game is not in progress!'}, room=sid)
+        return
+    
+    if len(word) < 3:
+        emit('error_message', {'msg': 'Word must be at least 3 letters!'}, room=sid)
+        return
+
+    if not check_dictionary(word):
+        emit('error_message', {'msg': 'Not a valid dictionary word!'}, room=sid)
+        return
+
+    # Ensure player exists in game
+    if sid not in game['players']:
+        emit('error_message', {'msg': 'Player not found in game!'}, room=sid)
+        return
+
+    # 1. Try to take from pool only
+    if can_make_word(word, game['active_pool']):
+        # Remove letters from pool
+        for char in word:
+            game['active_pool'].remove(char)
+        game['players'][sid]['words'].append(word)
+        game['players'][sid]['score'] += (len(word) - 2)
+        emit('update_board', game, room=room)
+        return
+
+    # 2. Try to steal from any player
+    for target_sid, player in game['players'].items():
+        for existing_word in player['words']:
+            # A steal must use letters from the existing word + at least 1 from the pool
+            combined_letters = list(existing_word.upper()) + game['active_pool']
+            
+            if can_make_word(word, combined_letters):
+                # Rules: must be longer, and not same root
+                if len(word) <= len(existing_word): continue
+                if same_root(word, existing_word): continue
+                
+                # Check if it actually uses at least one pool tile
+                needed_from_pool = Counter(word) - Counter(existing_word)
+                if not needed_from_pool: continue 
+
+                # Success! Remove pool tiles
+                for char, count in needed_from_pool.items():
+                    for _ in range(count):
+                        game['active_pool'].remove(char)
+                
+                # Remove word from victim, add to stealer
+                player['words'].remove(existing_word)
+                player['score'] -= (len(existing_word) - 2)
+                
+                game['players'][sid]['words'].append(word)
+                game['players'][sid]['score'] += (len(word) - 2)
+                
+                emit('update_board', game, room=room)
+                return
+
+    emit('error_message', {'msg': 'Cannot form word with available tiles'}, room=sid)
 
 @socketio.on('update_settings')
 def on_update_settings(data):
@@ -64,27 +142,47 @@ def on_toggle_ready(data):
 def on_start(data):
     room = data['room']
     game = rooms.get(room)
-    if game and request.sid == game['host_sid']:
-        # Check if everyone (except host maybe) is ready
-        all_ready = all(p['ready'] for sid, p in game['players'].items() if sid != game['host_sid'])
-        if not all_ready:
-            emit('error_message', {'msg': 'Not everyone is ready!'}, room=request.sid)
-            return
-        
-        game['status'] = 'playing'
-        game['tiles'] = generate_tiles(game['settings']['max_tiles'])
-        emit('game_start', game, room=room)
+    
+    if not game:
+        emit('error_message', {'msg': 'Room not found!'}, room=request.sid)
+        return
+    
+    if request.sid != game['host_sid']:
+        emit('error_message', {'msg': 'Only the host can start the game!'}, room=request.sid)
+        return
+    
+    # Check if everyone (except host maybe) is ready
+    all_ready = all(p['ready'] for sid, p in game['players'].items() if sid != game['host_sid'])
+    if not all_ready:
+        emit('error_message', {'msg': 'Not everyone is ready!'}, room=request.sid)
+        return
+    
+    game['status'] = 'playing'
+    game['tiles'] = generate_tiles(game['settings']['max_tiles'])
+    emit('game_start', game, room=room)
 
 @socketio.on('draw_tile')
 def on_draw(data):
     room = data['room']
     game = rooms.get(room)
-    if not game or game['status'] != 'playing': return
+    
+    if not game:
+        emit('error_message', {'msg': 'Game room not found!'}, room=request.sid)
+        return
+    
+    if game['status'] != 'playing':
+        emit('error_message', {'msg': 'Game is not in progress!'}, room=request.sid)
+        return
     
     # Turn validation
+    if not game['player_order'] or game['turn_index'] >= len(game['player_order']):
+        emit('error_message', {'msg': 'Invalid game state!'}, room=request.sid)
+        return
+    
     current_player_sid = game['player_order'][game['turn_index']]
     if request.sid != current_player_sid and data.get('auto') != True:
-        return # Not your turn
+        emit('error_message', {'msg': 'It is not your turn!'}, room=request.sid)
+        return
 
     if game['tiles']:
         tile = game['tiles'].pop(0)
@@ -92,3 +190,5 @@ def on_draw(data):
         # Advance turn
         game['turn_index'] = (game['turn_index'] + 1) % len(game['player_order'])
         emit('update_board', game, room=room)
+    else:
+        emit('error_message', {'msg': 'No tiles left to draw!'}, room=room)

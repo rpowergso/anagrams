@@ -16,8 +16,6 @@ from constants import (
     RANDOM_JITTER_MAX
 )
 
-# ... rest of your code ...
-
 nltk.download('punkt', quiet=True)
 stemmer = PorterStemmer()
 
