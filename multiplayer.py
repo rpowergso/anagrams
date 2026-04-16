@@ -87,6 +87,13 @@ def on_claim_word(data):
             game['active_pool'].remove(char)
         game['players'][sid]['words'].append(word)
         game['players'][sid]['score'] += (len(word) - 2)
+        
+        # Broadcast action
+        player_name = game['players'][sid]['username']
+        emit('player_action', {
+            'message': f"✓ {player_name} played \"{word}\""
+        }, room=room)
+        
         emit('update_board', game, room=room)
         return
 
@@ -116,6 +123,13 @@ def on_claim_word(data):
                 
                 game['players'][sid]['words'].append(word)
                 game['players'][sid]['score'] += (len(word) - 2)
+                
+                # Broadcast action
+                stealer_name = game['players'][sid]['username']
+                victim_name = player['username']
+                emit('player_action', {
+                    'message': f"🔥 {stealer_name} STOLE \"{existing_word}\" from {victim_name} to make \"{word}\""
+                }, room=room)
                 
                 emit('update_board', game, room=room)
                 return

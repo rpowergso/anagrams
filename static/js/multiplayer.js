@@ -5,11 +5,11 @@ let isMyTurn = false;
 let drawTimerInterval = null;
 let endGameVotes = {}; // Track who voted to end the game
 let hasVotedToEnd = false; // Did I vote to end?
+let playerReadyState = false; // Track my ready state
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Join logic
-    myUsername = prompt("Enter your username:") || "Player_" + Math.floor(Math.random() * 1000);
-    socket.emit('join', { room: ROOM_ID, username: myUsername });
+    // 1. Show custom username popup
+    showUsernamePopup();
 
     // 2. Input Listeners
     const wordInput = document.getElementById('wordInput');
@@ -35,7 +35,8 @@ socket.on('end_game_vote', (data) => {
     
     if (votesReceived >= votesNeeded) {
         // Start countdown to game end
-        showEndGameCountdown(data.players);
+        showSmallCountdown();
+        lockTextInput();
     }
 });
 
@@ -86,9 +87,19 @@ socket.on('error_message', (data) => {
     }
 });
 
+socket.on('player_action', (data) => {
+    showActionMessage(data.message);
+});
+
 /* --- ACTIONS --- */
 
 function toggleReady() {
+    playerReadyState = !playerReadyState;
+    const readyBtn = document.getElementById('ready-btn');
+    if (readyBtn) {
+        readyBtn.innerText = playerReadyState ? 'NOT READY' : 'READY UP';
+        readyBtn.style.background = playerReadyState ? '#e74c3c' : '';
+    }
     socket.emit('toggle_ready', { room: ROOM_ID });
 }
 
@@ -394,4 +405,162 @@ function showGameOverScreen(data) {
     `;
     
     document.body.appendChild(modal);
+}
+
+/* --- CUSTOM UI FUNCTIONS --- */
+
+function showUsernamePopup() {
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+    `;
+    
+    modal.innerHTML = `
+        <div style="background: #1a252f; padding: 50px; border-radius: 20px; text-align: center; border: 3px solid #3498db; max-width: 400px;">
+            <h1 style="font-size: 2rem; margin-bottom: 30px; letter-spacing: 2px;">ENTER USERNAME</h1>
+            <input type="text" id="username-input" placeholder="Your name..." 
+                   style="width: 100%; padding: 15px; border-radius: 8px; border: 2px solid #3498db; background: #2c3e50; color: white; font-size: 1.1rem; outline: none; margin-bottom: 25px; text-align: center;" autocomplete="off">
+            <div style="display: flex; gap: 15px; justify-content: center;">
+                <button class="btn btn-green" onclick="confirmUsername()" style="padding: 12px 40px; font-size: 1rem;">JOIN</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    const input = document.getElementById('username-input');
+    if (input) {
+        input.focus();
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') confirmUsername();
+        });
+    }
+}
+
+function confirmUsername() {
+    const input = document.getElementById('username-input');
+    const username = input.value.trim() || "Player_" + Math.floor(Math.random() * 1000);
+    myUsername = username;
+    
+    // Remove modal
+    const modals = document.querySelectorAll('div[style*="z-index: 10000"]');
+    modals.forEach(m => m.remove());
+    
+    // Emit join event
+    socket.emit('join', { room: ROOM_ID, username: myUsername });
+    
+    // Continue with game
+    const wordInput = document.getElementById('wordInput');
+    if (wordInput) {
+        wordInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') submitWord();
+        });
+    }
+    
+    socket.on('connect', () => {
+        mySid = socket.id;
+    });
+}
+
+function confirmLeaveGame() {
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+    `;
+    
+    modal.innerHTML = `
+        <div style="background: #1a252f; padding: 40px; border-radius: 20px; text-align: center; border: 3px solid #e74c3c; max-width: 400px;">
+            <h1 style="font-size: 1.8rem; margin-bottom: 25px; letter-spacing: 2px;">LEAVE GAME?</h1>
+            <p style="font-size: 1rem; opacity: 0.8; margin-bottom: 30px;">Are you sure you want to leave this game?</p>
+            <div style="display: flex; gap: 15px; justify-content: center;">
+                <button class="btn btn-leave" onclick="document.querySelector('div[style*=\\'z-index: 10000\\']').remove()" style="padding: 12px 30px;">CANCEL</button>
+                <a href="/homepage" style="text-decoration: none;">
+                    <button class="btn btn-green" style="padding: 12px 30px; background: #e74c3c;">LEAVE</button>
+                </a>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+}
+
+function showSmallCountdown() {
+    const timerDiv = document.createElement('div');
+    timerDiv.id = 'small-countdown-timer';
+    timerDiv.style.cssText = `
+        position: fixed;
+        bottom: 120px;
+        right: 30px;
+        background: rgba(231, 76, 60, 0.95);
+        border: 3px solid #e74c3c;
+        padding: 20px 30px;
+        border-radius: 15px;
+        font-size: 2rem;
+        font-weight: bold;
+        color: white;
+        text-align: center;
+        z-index: 8000;
+        min-width: 120px;
+        box-shadow: 0 0 20px rgba(231, 76, 60, 0.6);
+    `;
+    
+    let countdown = 10;
+    timerDiv.innerText = countdown;
+    document.body.appendChild(timerDiv);
+    
+    const countdownInterval = setInterval(() => {
+        countdown--;
+        timerDiv.innerText = countdown;
+        if (countdown <= 0) {
+            clearInterval(countdownInterval);
+            timerDiv.remove();
+            unlockTextInput();
+        }
+    }, 1000);
+}
+
+function lockTextInput() {
+    const input = document.getElementById('wordInput');
+    if (input) {
+        input.disabled = true;
+        input.style.opacity = '0.5';
+        input.style.cursor = 'not-allowed';
+        input.placeholder = 'Game ending...';
+    }
+}
+
+function unlockTextInput() {
+    const input = document.getElementById('wordInput');
+    if (input) {
+        input.disabled = false;
+        input.style.opacity = '1';
+        input.style.cursor = 'text';
+        input.placeholder = 'Type word...';
+    }
+}
+
+function showActionMessage(message) {
+    const msgDiv = document.getElementById('statusMessage');
+    if (msgDiv) {
+        msgDiv.innerText = message;
+        msgDiv.style.color = "#f39c12";
+        setTimeout(() => msgDiv.innerText = "", 4000);
+    }
 }

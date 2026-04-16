@@ -40,7 +40,7 @@
     </div>
 
     <div style="display: flex; gap: 15px; justify-content: center;">
-        <a href="/homepage" class="btn btn-leave" style="padding: 12px 25px;">LEAVE</a>
+        <button class="btn btn-leave" onclick="confirmLeaveGame()" style="padding: 12px 25px;">LEAVE</button>
         <button id="ready-btn" class="btn btn-blue" onclick="toggleReady()" style="padding: 12px 40px;">READY UP</button>
         <button id="start-btn" class="btn btn-green" onclick="startGame()" style="display: none; padding: 12px 40px;">START GAME</button>
     </div>
@@ -50,7 +50,7 @@
 <div id="game-container" style="display: none;">
     <!-- Top Nav -->
     <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; background: rgba(0,0,0,0.3);">
-        <a href="/homepage" class="btn btn-leave" onclick="return confirm('Leave game?')">LEAVE</a>
+        <button class="btn btn-leave" onclick="confirmLeaveGame()">LEAVE</button>
         
         <div style="text-align: center;">
             <div id="turn-indicator" style="font-weight: bold; font-size: 1.1rem; letter-spacing: 1px;">WAITING...</div>
