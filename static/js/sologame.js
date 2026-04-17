@@ -30,7 +30,23 @@ function toggleSoloAuto() {
 
 async function drawTile() {
     const data = await fetchTile();
-    if (data.done) { 
+    if (data.done) {
+        // In zen mode, regenerate tiles instead of ending
+        if (typeof ZEN_MODE !== 'undefined' && ZEN_MODE) {
+            // Regenerate tiles on the server
+            fetch('/get-tile')
+                .then(res => res.json())
+                .then(newData => {
+                    if (!newData.done) {
+                        activeTiles.push(newData.tile);
+                        renderTiles();
+                        if (soloAutoDraw) setSoloCountdown(AUTODRAW_INTERVAL_MS);
+                    }
+                });
+            return;
+        }
+        
+        // Normal solo mode - show game over
         clearInterval(soloInterval);
         const countdown = document.getElementById('solo-countdown');
         if (countdown) countdown.innerText = "NO TILES LEFT";

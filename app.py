@@ -53,8 +53,16 @@ def multiplayer_game(room_id):
 @app.route('/sologamescreen')
 def solo_game():
     session['tiles'] = generate_tiles()
+    session['zen_mode'] = False
     session.modified = True
     return render_template('sologamescreen.html', tile_count=TILE_COUNT, autodraw_interval=AUTODRAW_INTERVAL_MS)
+
+@app.route('/zengamescreen')
+def zen_game():
+    session['tiles'] = generate_tiles()
+    session['zen_mode'] = True
+    session.modified = True
+    return render_template('zengamescreen.html', tile_count=TILE_COUNT, autodraw_interval=AUTODRAW_INTERVAL_MS)
 
 @app.route('/botgamescreen', methods=['POST'])
 def bot_game():
@@ -74,7 +82,14 @@ def bot_game():
 def get_tile():
     tiles = session.get('tiles', [])
     if not tiles:
-        return jsonify({'tile': None, 'done': True})
+        # In zen mode, regenerate tiles instead of ending
+        if session.get('zen_mode', False):
+            tiles = generate_tiles()
+            session['tiles'] = tiles
+            session.modified = True
+        else:
+            return jsonify({'tile': None, 'done': True})
+    
     tile = tiles.pop(0)
     session['tiles'] = tiles
     session.modified = True

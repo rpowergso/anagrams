@@ -1,0 +1,41 @@
+{% extends "layout.html" %}
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; background: rgba(0,0,0,0.3);">
+    <button class="btn btn-leave" onclick="confirmLeaveGame()">LEAVE GAME</button>
+    <div id="solo-countdown" style="font-family: monospace; color: #9b59b6; font-weight: bold; font-size: 1.4rem; letter-spacing: 2px;">🧘 ZEN MODE</div>
+    <div style="color: #9b59b6; font-weight: bold;">Relax & Play</div>
+</div>
+
+<div style="text-align: center; padding: 30px;">
+    <div id="tilePool" style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; min-height: 100px; margin-bottom: 30px;"></div>
+    <button class="btn btn-blue" onclick="drawTile()">DRAW TILE</button>
+    <button class="btn btn-toggle" id="soloAutoBtn" onclick="toggleSoloAuto()">AUTODRAW: OFF</button>
+</div>
+
+<div style="padding: 0 40px; padding-bottom: 120px;">
+    <div class="score-badge" id="playerTotalScore">0</div>
+    <h3 style="border-bottom: 2px solid var(--player-accent); display: inline-block;">MY WORDS</h3>
+    <div id="myWords"></div> <!-- ZEN WORDS GO HERE -->
+</div>
+
+<div style="position: fixed; bottom: 0; width: 100%; background: #1a252f; padding: 20px; display: flex; justify-content: center; gap: 15px; z-index: 1000;">
+    <input type="text" id="wordInput" placeholder="Type word..." style="padding: 15px; border-radius: 30px; width: 350px; border: none; font-size: 1.2rem;">
+    <button class="btn btn-green" onclick="checkWord()">SUBMIT</button>
+    <div id="result" style="align-self: center; font-weight: bold; margin-left: 15px;"></div>
+</div>
+
+<script>
+    const AUTODRAW_INTERVAL_MS = {{ autodraw_interval }};
+    const TILE_COUNT = {{ tile_count }};
+    const ZEN_MODE = true;
+    let activeTiles = []; 
+    let myWords = []; 
+    let tilesDrawn = 0;
+
+    window.onload = () => { renderTiles(); };
+    const input = document.getElementById('wordInput');
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') checkWord(); });
+</script>
+<script src="/static/js/gamefunctions.js"></script>
+<script src="/static/js/sologame.js"></script>
+{% endblock %}
