@@ -10,6 +10,9 @@ COMMON_WORD_THRESHOLD = 4.0
 # Max randomness added/subtracted to the delay (seconds)
 RANDOM_JITTER_MAX = 0.5
 
+# Hint system frequency threshold (minimum frequency for "big hint" suggestions)
+HINT_FREQUENCY_THRESHOLD = 3.2
+
 BOT_DIFFICULTIES = {
     'easy': {
         'weights': {0: 50, 3: 20, 4: 12, 5: 10, 6: 4, 7: 1},

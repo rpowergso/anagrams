@@ -8,7 +8,7 @@ from flask_session import Session
 from flask_socketio import SocketIO
 
 # FIXED: Import correctly from respective files
-from game import check_dictionary, choose_bot_move, generate_tiles, same_root
+from game import check_dictionary, choose_bot_move, generate_tiles, same_root, get_hints
 from constants import TILE_COUNT, AUTODRAW_INTERVAL_MS
 
 app = Flask(__name__)
@@ -114,6 +114,14 @@ def check_stem():
     w1 = request.json.get('word1', '').lower()
     w2 = request.json.get('word2', '').lower()
     return jsonify({'same_root': same_root(w1, w2)})
+
+@app.route('/get-hint', methods=['POST'])
+def get_hint():
+    data = request.get_json() or {}
+    active_tiles = data.get('activeTiles', [])
+    board_words = data.get('boardWords', [])
+    hints = get_hints(active_tiles, board_words)
+    return jsonify(hints)
 
 # Import multiplayer logic at the end
 import multiplayer

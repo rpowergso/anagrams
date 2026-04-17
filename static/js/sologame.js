@@ -175,3 +175,50 @@ function confirmLeaveGame() {
     
     document.body.appendChild(modal);
 }
+
+async function getSmallHint() {
+    const response = await fetch('/get-hint', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            activeTiles: activeTiles,
+            boardWords: myWords
+        })
+    });
+    const data = await response.json();
+    if (data.small_hint) {
+        const resultEl = document.getElementById('result');
+        if (resultEl) {
+            resultEl.innerText = `💡 ${data.small_hint}`;
+            resultEl.style.color = '#f39c12';
+            setTimeout(() => { resultEl.innerText = ''; }, 3000);
+        }
+    }
+}
+
+async function getBigHint() {
+    const response = await fetch('/get-hint', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            activeTiles: activeTiles,
+            boardWords: myWords
+        })
+    });
+    const data = await response.json();
+    if (data.big_hint) {
+        const resultEl = document.getElementById('result');
+        if (resultEl) {
+            resultEl.innerText = `💡💡 ${data.big_hint}`;
+            resultEl.style.color = '#e74c3c';
+            setTimeout(() => { resultEl.innerText = ''; }, 3000);
+        }
+    } else {
+        const resultEl = document.getElementById('result');
+        if (resultEl) {
+            resultEl.innerText = 'No hints available';
+            resultEl.style.color = '#e74c3c';
+            setTimeout(() => { resultEl.innerText = ''; }, 2000);
+        }
+    }
+}

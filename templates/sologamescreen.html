@@ -18,10 +18,12 @@
     <div id="myWords"></div> <!-- SOLO WORDS GO HERE -->
 </div>
 
-<div style="position: fixed; bottom: 0; width: 100%; background: #1a252f; padding: 20px; display: flex; justify-content: center; gap: 15px; z-index: 1000;">
+<div style="position: fixed; bottom: 0; width: 100%; background: #1a252f; padding: 20px; display: flex; justify-content: center; gap: 15px; align-items: center; z-index: 1000;">
     <input type="text" id="wordInput" placeholder="Type word..." style="padding: 15px; border-radius: 30px; width: 350px; border: none; font-size: 1.2rem;">
     <button class="btn btn-green" onclick="checkWord()">SUBMIT</button>
-    <div id="result" style="align-self: center; font-weight: bold; margin-left: 15px;"></div>
+    <div id="result" style="font-weight: bold;"></div>
+    <button class="btn btn-toggle" onclick="getSmallHint()" style="background: #f39c12; font-size: 0.9rem; padding: 10px 15px;">SMALL HINT</button>
+    <button class="btn btn-toggle" onclick="getBigHint()" style="background: #e74c3c; font-size: 0.9rem; padding: 10px 15px;">BIG HINT</button>
 </div>
 
 <script>

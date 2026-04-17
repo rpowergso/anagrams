@@ -13,7 +13,8 @@ from constants import (
     MIN_WORD_LENGTH, 
     TILE_COUNT, 
     COMMON_WORD_THRESHOLD, 
-    RANDOM_JITTER_MAX
+    RANDOM_JITTER_MAX,
+    HINT_FREQUENCY_THRESHOLD
 )
 
 nltk.download('punkt', quiet=True)
@@ -142,6 +143,45 @@ def choose_bot_move(active_tiles, board_words, difficulty='medium'):
 def check_dictionary(word):
     if not word or len(word) < MIN_WORD_LENGTH: return False
     return twl.check(word.lower())
+
+def get_hints(active_tiles, board_words):
+    """Returns two hints: (small_hint, big_hint).
+    - small_hint: most frequent word from active tiles
+    - big_hint: longest word above HINT_FREQUENCY_THRESHOLD
+    """
+    active_tiles_str = "".join(active_tiles).lower()
+    board_words_upper = list(dict.fromkeys(w.upper() for w in board_words))
+    
+    small_hint = None
+    small_hint_freq = -1
+    big_hint = None
+    big_hint_len = 0
+    
+    # Find all possible words from active tiles
+    possible_words = twl.anagram(active_tiles_str)
+    
+    for word in possible_words:
+        word = word.upper()
+        if len(word) < MIN_WORD_LENGTH: continue
+        if word in board_words_upper: continue
+        if any(same_root(word, existing) for existing in board_words_upper): continue
+        
+        freq = zipf_frequency(word, 'en')
+        
+        # Small hint: most frequent word
+        if freq > small_hint_freq:
+            small_hint_freq = freq
+            small_hint = word
+        
+        # Big hint: longest word above threshold
+        if freq >= HINT_FREQUENCY_THRESHOLD and len(word) > big_hint_len:
+            big_hint_len = len(word)
+            big_hint = word
+    
+    return {
+        'small_hint': small_hint,
+        'big_hint': big_hint
+    }
 
 def generate_tiles(count=TILE_COUNT):
     pool = []
