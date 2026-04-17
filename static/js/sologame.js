@@ -113,6 +113,9 @@ async function checkWord() {
             renderSoloWords(); // Uses function in gamefunctions.js
             input.value = '';
             if (resultEl) resultEl.innerText = "Valid!";
+        } else {
+            input.value = '';
+            if (resultEl) resultEl.innerText = "Not a word!";
         }
     } else {
         const steal = await canStealWord(word, myWords, activeTiles);
@@ -130,7 +133,14 @@ async function checkWord() {
                 renderTiles();
                 renderSoloWords();
                 input.value = '';
+                if (resultEl) resultEl.innerText = "Word Stolen!";
+            } else {
+                input.value = '';
+                if (resultEl) resultEl.innerText = "Not a word!";
             }
+        } else {
+            input.value = '';
+            if (resultEl) resultEl.innerText = "Can't make that!";
         }
     }
 }

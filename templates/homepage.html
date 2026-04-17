@@ -19,7 +19,7 @@
             <!-- Join Room Form -->
             <form action="/join-room" method="POST" style="display: flex; flex-direction: column; gap: 12px;">
                 <input type="text" name="room_id" placeholder="ROOM CODE" 
-                       style="width: 100%; padding: 12px 15px; border-radius: 8px; border: 2px solid rgba(155, 89, 182, 0.3); background: rgba(0,0,0,0.2); color: white; font-weight: bold; text-transform: uppercase; outline: none; text-align: center; font-size: 0.95rem;">
+                       style="width: 100%; padding: 12px 15px; border-radius: 8px; border: 2px solid rgba(155, 89, 182, 0.3); background: rgba(0,0,0,0.2); color: white; font-weight: bold; text-transform: uppercase; outline: none; text-align: center; font-size: 0.95rem; box-sizing: border-box;">
                 <button type="submit" class="btn btn-green" style="width: 100%; padding: 12px; border-radius: 8px;">JOIN ROOM</button>
             </form>
             
@@ -42,22 +42,14 @@
         <div class="menu-card" style="background: rgba(52, 152, 219, 0.05); border: 2px solid rgba(52, 152, 219, 0.2);">
             <h2 style="color: #3498db; letter-spacing: 2px; margin-bottom: 30px;">SOLO</h2>
             <a href="/sologamescreen" style="text-decoration: none;">
-                <button class="btn btn-blue" style="width: 100%; height: 60px; font-size: 1.2rem; letter-spacing: 2px;">PLAY SOLO</button>
+                <button class="btn btn-blue" style="width: 100%; height: 60px; font-size: 1.2rem; letter-spacing: 2px; margin-bottom: 15px;">PLAY SOLO</button>
             </a>
-            <p style="margin-top: 25px; opacity: 0.7; font-size: 0.9rem; line-height: 1.6;">Test your word-finding skills against the clock with unlimited tiles.</p>
-        </div>
-
-    </div>
-
-    <!-- ZEN MODE SECTION -->
-    <div style="margin-top: 60px; max-width: 600px; margin-left: auto; margin-right: auto;">
-        <div class="menu-card" style="background: linear-gradient(135deg, rgba(155, 89, 182, 0.1), rgba(52, 152, 219, 0.1)); border: 2px solid rgba(155, 89, 182, 0.3);">
-            <h2 style="color: #9b59b6; letter-spacing: 2px; margin-bottom: 20px; font-size: 1.3rem;">🧘 ZEN MODE</h2>
-            <p style="margin-bottom: 25px; opacity: 0.8; font-size: 0.95rem; line-height: 1.8;">Relax and play at your own pace. Unlimited tiles, no pressure. Just find words and enjoy.</p>
             <a href="/zengamescreen" style="text-decoration: none;">
-                <button class="btn btn-toggle" style="width: 100%; height: 50px; font-size: 1.1rem; background: linear-gradient(135deg, #9b59b6, #8e44ad); letter-spacing: 1px;">ENTER ZEN MODE</button>
+                <button class="btn btn-toggle" style="width: 100%; height: 50px; font-size: 1rem; background: linear-gradient(135deg, #9b59b6, #8e44ad); letter-spacing: 1px;">PLAY ZEN</button>
             </a>
+            <p style="margin-top: 25px; opacity: 0.7; font-size: 0.9rem; line-height: 1.6;">Test your word-finding skills against the clock with unlimited tiles. Or relax in Zen Mode.</p>
         </div>
+
     </div>
 </div>
 
