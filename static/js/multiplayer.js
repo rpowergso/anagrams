@@ -22,6 +22,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     submitWord();
                 }
+            } else if (e.key === ' ') {
+                // Space key submits the word instead of typing a space
+                e.preventDefault();
+                submitWord();
             }
         });
     }
