@@ -15,7 +15,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const wordInput = document.getElementById('wordInput');
     if (wordInput) {
         wordInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') submitWord();
+            if (e.key === 'Enter') {
+                // If it's my turn and input is empty, draw tile instead of submitting
+                if (isMyTurn && wordInput.value.trim().length === 0) {
+                    drawTile();
+                } else {
+                    submitWord();
+                }
+            }
         });
     }
 
