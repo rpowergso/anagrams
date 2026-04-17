@@ -6,6 +6,8 @@ let drawTimerInterval = null;
 let endGameVotes = {}; // Track who voted to end the game
 let hasVotedToEnd = false; // Did I vote to end?
 let playerReadyState = false; // Track my ready state
+let countdownActive = false; // Track if final countdown is active
+let playerLockedOut = false; // Track if player is locked out during countdown
 
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Show custom username popup
@@ -138,6 +140,11 @@ function drawTile() {
 }
 
 function submitWord() {
+    // If locked out during countdown, don't allow submission
+    if (playerLockedOut) {
+        return;
+    }
+    
     const input = document.getElementById('wordInput');
     const word = input.value.trim().toUpperCase();
     if (word.length < 3) return;
@@ -311,6 +318,13 @@ function renderPlayers(players) {
 
 function requestEndGame() {
     hasVotedToEnd = true;
+    
+    // If countdown is active, lock player from typing
+    if (countdownActive) {
+        playerLockedOut = true;
+        lockTextInput();
+    }
+    
     socket.emit('vote_end_game', { room: ROOM_ID });
 }
 
@@ -318,6 +332,9 @@ function updateEndGameUI(votesReceived, votesNeeded) {
     const endGameBtn = document.getElementById('endGameButton');
     if (endGameBtn) {
         endGameBtn.innerText = `END GAME (${votesReceived}/${votesNeeded})`;
+        if (hasVotedToEnd) {
+            endGameBtn.innerText = `END GAME ✓ (${votesReceived}/${votesNeeded})`;
+        }
     }
 }
 
@@ -383,6 +400,9 @@ function showGameOverScreen(data) {
         score: score
     }));
     
+    // Sort scores from highest to lowest
+    scores.sort((a, b) => b.score - a.score);
+    
     for (const [sid, score] of Object.entries(data.final_scores)) {
         if (score > maxScore) {
             maxScore = score;
@@ -397,9 +417,9 @@ function showGameOverScreen(data) {
         ? `🤝 GAME OVER - TIE!` 
         : `🏆 ${winner.toUpperCase()} WINS!`;
     
-    const scoresHtml = scores.map(s => `
+    const scoresHtml = scores.map((s, idx) => `
         <div style="font-size: 1.2rem; margin: 10px; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 8px;">
-            ${s.username}: <span style="color: #2ecc71; font-weight: bold;">${s.score} points</span>
+            ${idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '  '} ${s.username}: <span style="color: #2ecc71; font-weight: bold;">${s.score} points</span>
         </div>
     `).join('');
     
@@ -513,6 +533,9 @@ function confirmLeaveGame() {
 }
 
 function showSmallCountdown() {
+    countdownActive = true;
+    playerLockedOut = false; // Reset lock - players can still type initially
+    
     const timerDiv = document.createElement('div');
     timerDiv.id = 'small-countdown-timer';
     timerDiv.style.cssText = `
@@ -542,6 +565,8 @@ function showSmallCountdown() {
         if (countdown <= 0) {
             clearInterval(countdownInterval);
             timerDiv.remove();
+            countdownActive = false;
+            playerLockedOut = false;
             unlockTextInput();
         }
     }, 1000);
