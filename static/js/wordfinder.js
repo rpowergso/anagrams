@@ -218,6 +218,9 @@ finderForm.addEventListener('submit', async event => {
         finderMore.hidden = true;
         return;
     }
+    const wordPath = `/word-finder/${encodeURIComponent(sourceLetters.toLowerCase())}`;
+    if (window.location.pathname !== wordPath) history.pushState({word: sourceLetters}, '', wordPath);
+    showDefinition(sourceLetters);
     if (shownThrough < 1) {
         finderStatus.textContent = 'No shorter legal game words are possible.';
         finderMore.hidden = true;
@@ -295,7 +298,6 @@ function selectWord(word, paths) {
         keepChainOnNextSearch = true;
     }
     finderInput.value = word;
-    showDefinition(word);
     finderForm.requestSubmit();
     window.scrollTo({top: 0, behavior: 'smooth'});
 }
@@ -328,11 +330,21 @@ async function showDefinition(word) {
             list.appendChild(row);
         }
         definitionBody.replaceChildren();
-        if (list.children.length) definitionBody.appendChild(list);
-        else definitionBody.textContent = 'No definition is available for this word. The game dictionary includes words this dictionary may not cover.';
+        if (data.isWord && list.children.length) definitionBody.appendChild(list);
+        else definitionBody.textContent = `${word} is not a word.`;
     } catch (error) {
         if (request === definitionRequest) definitionBody.textContent = 'Definition unavailable right now.';
     } finally {
         clearTimeout(timeout);
     }
 }
+
+if (finderInput.value) finderForm.requestSubmit();
+
+window.addEventListener('popstate', () => {
+    const routeWord = decodeURIComponent(window.location.pathname.split('/').pop() || '').toUpperCase();
+    if (/^[A-Z]{1,14}$/.test(routeWord)) {
+        finderInput.value = routeWord;
+        finderForm.requestSubmit();
+    }
+});

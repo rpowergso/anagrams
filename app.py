@@ -34,8 +34,12 @@ def index():
     return render_template('homepage.html')
 
 @app.route('/word-finder')
-def word_finder():
-    return render_template('wordfinder.html')
+@app.route('/word-finder/<word>')
+def word_finder(word=''):
+    initial_word = word.upper().strip()
+    if initial_word and (not initial_word.isalpha() or len(initial_word) > 14):
+        return redirect(url_for('word_finder'))
+    return render_template('wordfinder.html', initial_word=initial_word)
 
 @app.route('/ranked')
 def ranked():
@@ -297,7 +301,11 @@ def word_definition(word):
                 'definition': definition.strip() if separator else raw_definition.strip(),
             })
 
-    payload = {'word': normalized.upper(), 'definitions': definitions}
+    payload = {
+        'word': normalized.upper(),
+        'isWord': bool(definitions),
+        'definitions': definitions,
+    }
     if len(definition_cache) >= 500:
         definition_cache.pop(next(iter(definition_cache)))
     definition_cache[normalized] = {'stored_at': time.time(), 'payload': payload}
