@@ -37,7 +37,7 @@ def index():
 @app.route('/word-finder/<word>')
 def word_finder(word=''):
     initial_word = word.upper().strip()
-    if initial_word and (not initial_word.isalpha() or len(initial_word) > 14):
+    if initial_word and (not initial_word.isalpha() or len(initial_word) > 15):
         return redirect(url_for('word_finder'))
     return render_template('wordfinder.html', initial_word=initial_word)
 
@@ -231,8 +231,8 @@ def word_extensions():
         return jsonify({'error': 'Forced letters must contain A–Z only.'}), 400
     if any(not word.isalpha() for word in forced_words):
         return jsonify({'error': 'Forced words must contain A–Z only.'}), 400
-    if not letters.isalpha() or len(letters) > 14:
-        return jsonify({'error': 'Enter 1–14 letters (A–Z only).'}), 400
+    if not letters.isalpha() or len(letters) > 15:
+        return jsonify({'error': 'Enter 1–15 letters (A–Z only).'}), 400
 
     try:
         min_added = int(data.get('minAdded', 1))

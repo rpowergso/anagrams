@@ -213,8 +213,8 @@ finderForm.addEventListener('submit', async event => {
     else chainPath.hidden = true;
     const maximum = reverseMode.checked ? sourceLetters.length - 3 : 15 - sourceLetters.length;
     shownThrough = Math.min(5, maximum);
-    if (!/^[A-Z]+$/.test(sourceLetters) || sourceLetters.length > 14) {
-        finderStatus.textContent = 'Enter 1–14 letters (A–Z only).';
+    if (!/^[A-Z]+$/.test(sourceLetters) || sourceLetters.length > 15) {
+        finderStatus.textContent = 'Enter 1–15 letters (A–Z only).';
         finderMore.hidden = true;
         return;
     }
@@ -222,7 +222,9 @@ finderForm.addEventListener('submit', async event => {
     if (window.location.pathname !== wordPath) history.pushState({word: sourceLetters}, '', wordPath);
     showDefinition(sourceLetters);
     if (shownThrough < 1) {
-        finderStatus.textContent = 'No shorter legal game words are possible.';
+        finderStatus.textContent = reverseMode.checked
+            ? 'No shorter legal game words are possible.'
+            : 'This word is already at the maximum game-word length.';
         finderMore.hidden = true;
         return;
     }
@@ -255,8 +257,8 @@ function updateChainAction() {
 
 findBiggest.addEventListener('click', async () => {
     sourceLetters = finderInput.value.trim().toUpperCase();
-    if (!/^[A-Z]+$/.test(sourceLetters) || sourceLetters.length > 14) {
-        finderStatus.textContent = 'Enter 1–14 letters (A–Z only).';
+    if (!/^[A-Z]+$/.test(sourceLetters) || sourceLetters.length > 15) {
+        finderStatus.textContent = 'Enter 1–15 letters (A–Z only).';
         return;
     }
     finderResults.innerHTML = '';
@@ -354,7 +356,7 @@ if (finderInput.value) finderForm.requestSubmit();
 
 window.addEventListener('popstate', () => {
     const routeWord = decodeURIComponent(window.location.pathname.split('/').pop() || '').toUpperCase();
-    if (/^[A-Z]{1,14}$/.test(routeWord)) {
+    if (/^[A-Z]{1,15}$/.test(routeWord)) {
         finderInput.value = routeWord;
         finderForm.requestSubmit();
     }
