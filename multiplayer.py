@@ -80,6 +80,10 @@ def on_claim_word(data):
         emit('error_message', {'msg': 'Player not found in game!'}, room=sid)
         return
 
+    if any(word in player['words'] for player in game['players'].values()):
+        emit('error_message', {'msg': 'That word is already on the board!'}, room=sid)
+        return
+
     # 1. Try to take from pool only
     if can_make_word(word, game['active_pool']):
         # Remove letters from pool

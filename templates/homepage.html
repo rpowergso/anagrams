@@ -1,11 +1,10 @@
 {% extends "layout.html" %}
 {% block content %}
-<div style="text-align: center; padding: 50px;">
+<div class="home-shell">
     <!-- The Big "Pretty" Title -->
     <h1 style="font-size: 4.5rem; text-shadow: 0 8px 0 var(--tile-shadow); margin-bottom: 60px; letter-spacing: 4px;">ANAGRAMS</h1>
-    
     <!-- 3-COLUMN LAYOUT: Multiplayer | Bot (Center) | Solo -->
-    <div style="display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 40px; max-width: 1400px; margin: 0 auto;">
+    <div class="home-top-row">
         
         <!-- LEFT COLUMN: MULTIPLAYER -->
         <div class="menu-card" style="background: rgba(155, 89, 182, 0.05); border: 2px solid rgba(155, 89, 182, 0.2);">
@@ -51,10 +50,27 @@
         </div>
 
     </div>
+    <div class="home-bottom-row">
+        <div class="menu-card" style="background: rgba(155, 89, 182, 0.05); border: 2px solid rgba(155, 89, 182, 0.2);">
+            <h2 style="color: #9b59b6; letter-spacing: 2px; margin-bottom: 30px;">WORD FINDER</h2>
+            <a class="btn btn-toggle menu-link" href="/word-finder">FIND WORDS</a>
+            <p>Explore words, build chains, and click any result to see its definition.</p>
+        </div>
+        <div class="menu-card" style="background: rgba(46, 204, 113, 0.05); border: 2px solid rgba(46, 204, 113, 0.2);">
+            <h2 style="color: #2ecc71; letter-spacing: 2px; margin-bottom: 30px;">RANKED PUZZLES</h2>
+            <a class="btn btn-green menu-link" href="/rankedpuzzles">PLAY PUZZLES</a>
+            <p>Find the best plays and climb the ratings with ranked word puzzles.</p>
+        </div>
+    </div>
 </div>
 
 <style>
-    .menu-card {
+    .home-shell { text-align: center; padding: 50px; }
+    .home-top-row { display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 40px; max-width: 1400px; margin: 0 auto; }
+    .home-bottom-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px; max-width: 865px; margin: 55px auto 0; }
+    .menu-link { display: block; text-decoration: none; padding: 16px; }
+    .home-bottom-row p { margin-top: 20px; opacity: .7; font-size: .9rem; line-height: 1.6; }
+    .menu-card { min-width: 0; box-sizing: border-box;
         padding: 40px 30px;
         border-radius: 15px;
         box-shadow: 0 10px 30px rgba(0,0,0,0.3);
@@ -74,7 +90,7 @@
     }
 
     @media (max-width: 1024px) {
-        div[style*="grid-template-columns: 1fr 1.2fr 1fr"] {
+        .home-top-row {
             grid-template-columns: 1fr 1fr !important;
         }
         .menu-card {
@@ -83,7 +99,9 @@
     }
 
     @media (max-width: 768px) {
-        div[style*="grid-template-columns: 1fr 1.2fr 1fr"] {
+        .home-shell { padding: 30px 18px; }
+        .home-shell h1 { font-size: clamp(2.4rem, 10vw, 4.5rem) !important; }
+        .home-top-row, .home-bottom-row {
             grid-template-columns: 1fr !important;
         }
     }

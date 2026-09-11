@@ -227,12 +227,23 @@ function setBotStatus(msg) {
     }
 }
 
+let playerSubmissionPending = false;
+
 async function checkPlayerWord() {
     const input = document.getElementById('playerWordInput');
     const word = input.value.toUpperCase().trim();
     if (word.length < 3) return;
+    if (playerSubmissionPending) return;
+    if ([...playerWords, ...botWords].some(existing => existing.toUpperCase() === word)) {
+        setBotStatus(`"${word}" is already on the board`);
+        return;
+    }
 
-    if (canMakeWord(word, activeTiles)) {
+    playerSubmissionPending = true;
+    input.disabled = true;
+
+    try {
+      if (canMakeWord(word, activeTiles)) {
         const response = await fetch('/check-word', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -248,7 +259,7 @@ async function checkPlayerWord() {
             botCancelId++; 
             requestBotMove();
         }
-    } else {
+      } else {
         const steal = await canStealWord(word, [...botWords, ...playerWords], activeTiles);
         if (steal) {
             const response = await fetch('/check-word', {
@@ -272,6 +283,11 @@ async function checkPlayerWord() {
                 requestBotMove();
             }
         }
+      }
+    } finally {
+        playerSubmissionPending = false;
+        input.disabled = false;
+        input.focus();
     }
 }
 

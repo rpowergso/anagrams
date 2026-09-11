@@ -8,6 +8,7 @@ let hasVotedToEnd = false; // Did I vote to end?
 let playerReadyState = false; // Track my ready state
 let countdownActive = false; // Track if final countdown is active
 let playerLockedOut = false; // Track if player is locked out during countdown
+let lastSubmittedWord = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Show custom username popup
@@ -84,6 +85,7 @@ socket.on('game_start', (data) => {
 /* --- GAMEPLAY EVENTS --- */
 
 socket.on('update_board', (data) => {
+    lastSubmittedWord = null;
     updateUI(data);
 });
 
@@ -92,6 +94,7 @@ socket.on('game_state', (data) => {
 });
 
 socket.on('error_message', (data) => {
+    lastSubmittedWord = null;
     const msgDiv = document.getElementById('statusMessage');
     if (msgDiv) {
         msgDiv.innerText = data.msg;
@@ -148,6 +151,8 @@ function submitWord() {
     const input = document.getElementById('wordInput');
     const word = input.value.trim().toUpperCase();
     if (word.length < 3) return;
+    if (lastSubmittedWord === word) return;
+    lastSubmittedWord = word;
 
     socket.emit('claim_word', { 
         room: ROOM_ID, 
@@ -488,17 +493,6 @@ function confirmUsername() {
     // Emit join event
     socket.emit('join', { room: ROOM_ID, username: myUsername });
     
-    // Continue with game
-    const wordInput = document.getElementById('wordInput');
-    if (wordInput) {
-        wordInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') submitWord();
-        });
-    }
-    
-    socket.on('connect', () => {
-        mySid = socket.id;
-    });
 }
 
 function confirmLeaveGame() {

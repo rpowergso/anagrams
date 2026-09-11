@@ -1,0 +1,96 @@
+{% extends "layout.html" %}
+{% block content %}
+<main class="finder-shell">
+    <a href="/homepage" class="finder-back">← BACK TO HOME</a>
+    <h1>WORD FINDER</h1>
+    <p class="finder-help">Enter a word or loose letters. Every result uses all of them; highlighted tiles are the added letters. Click a result to search from it and see its definition.</p>
+    <form id="finderForm" class="finder-form">
+        <input id="finderInput" maxlength="14" autocomplete="off" placeholder="e.g. VAIN" required>
+        <button class="btn btn-green" type="submit">FIND WORDS</button>
+        <button id="findBiggest" class="btn btn-toggle" type="button" hidden>FIND BIGGEST WORD</button>
+    </form>
+    <section id="definitionPanel" aria-live="polite" hidden>
+        <h2 id="definitionTitle"></h2>
+        <div id="definitionBody"></div>
+        <p class="definition-credit">Definitions powered by <a href="https://www.datamuse.com/api/" target="_blank" rel="noopener noreferrer">Datamuse</a>.</p>
+    </section>
+    <div class="chain-controls">
+        <label><input id="reverseMode" type="checkbox"> REVERSE MODE</label>
+        <label><input id="chainMode" type="checkbox"> CHAIN MODE</label>
+        <label>ADD <input id="chainStep" type="number" min="1" max="14" value="1"> LETTER(S) AT A TIME</label>
+    </div>
+    <button id="toggleConstraints" class="btn btn-toggle" type="button" aria-expanded="false">CONSTRAINTS</button>
+    <div id="chainConstraints" class="chain-constraints" hidden>
+        <strong>CHAIN CONSTRAINTS</strong>
+        <div id="forcedLetterRows">
+            <div class="forced-letter-row">
+                <label>STEP <input class="forced-step" type="number" min="1" value="1"></label>
+                <label>FORCE LETTERS <input class="forced-letters" maxlength="14" placeholder="e.g. E"></label>
+            </div>
+        </div>
+        <button id="addForcedLetter" class="btn btn-blue" type="button">+ FORCE ANOTHER STEP</button>
+        <strong>MANDATORY WAYPOINT WORDS</strong>
+        <small>Every chain must pass through each word in length order.</small>
+        <div id="forcedWordRows">
+            <div class="forced-word-row">
+                <input class="forced-word" maxlength="15" placeholder="e.g. NAIVE">
+            </div>
+        </div>
+        <button id="addForcedWord" class="btn btn-blue" type="button">+ ADD ANOTHER WAYPOINT</button>
+    </div>
+    <div id="finderStatus" aria-live="polite"></div>
+    <div id="chainPath" hidden></div>
+    <div id="finderResults"></div>
+    <button id="finderMore" class="btn btn-toggle" type="button" hidden></button>
+</main>
+<script src="/static/js/wordfinder.js"></script>
+<style>
+    #definitionPanel { max-width: 720px; margin: -14px auto 30px; padding: 18px 24px; text-align: left; background: rgba(0,0,0,.2); border: 2px solid rgba(243,229,171,.35); border-radius: 12px; }
+    #definitionPanel[hidden] { display: none; }
+    #definitionTitle { margin: 0 0 12px; color: var(--tile-bg); letter-spacing: 2px; overflow-wrap: anywhere; }
+    #definitionBody { line-height: 1.5; }
+    #definitionBody ol { margin: 0; padding-left: 24px; }
+    #definitionBody li { margin-bottom: 12px; }
+    .definition-credit { margin-bottom: 0; }
+    .definition-credit, .definition-credit a { color: #ddd; font-size: .8rem; }
+    .finder-word:focus-visible, .chain-word-tiles:focus-visible { outline: 3px solid white; outline-offset: 4px; }
+    button.chain-word-tiles { border: 0; color: inherit; cursor: pointer; }
+    .finder-shell { max-width: 1100px; margin: 0 auto; padding: 35px 25px 70px; text-align: center; }
+    .finder-back { color: #fff; opacity: .75; text-decoration: none; float: left; }
+    .finder-shell h1 { clear: both; padding-top: 28px; letter-spacing: 3px; }
+    .finder-help { opacity: .8; }
+    .finder-form { display: flex; justify-content: center; gap: 12px; margin: 30px 0; }
+    .finder-form input { width: min(420px, 60vw); padding: 15px 20px; border: 0; border-radius: 30px; font-size: 1.2rem; text-transform: uppercase; }
+    .result-group { margin: 28px 0; text-align: left; }
+    .result-group h2 { color: #f3e5ab; }
+    .finder-words { display: flex; flex-wrap: wrap; gap: 10px; }
+    .finder-word { display: flex; gap: 2px; padding: 6px; border-radius: 8px; background: rgba(0,0,0,.22); }
+    .finder-word { border: 0; color: inherit; cursor: pointer; }
+    .finder-word .added { background: #2ecc71; color: #102b1b; box-shadow: 0 2px 0 #1d9b50; }
+    .finder-word.has-chain { background: #8e44ad; box-shadow: 0 0 12px rgba(155,89,182,.65); }
+    .chain-controls { display: flex; justify-content: center; align-items: center; gap: 25px; margin: -12px 0 28px; font-weight: bold; }
+    .chain-controls input[type="number"] { width: 45px; padding: 7px; border: 0; border-radius: 7px; text-align: center; font-weight: bold; }
+    .chain-constraints { max-width: 700px; margin: 0 auto 25px; padding: 16px; border-radius: 12px; background: rgba(0,0,0,.18); display: grid; gap: 12px; }
+    .chain-constraints[hidden] { display: none; }
+    #toggleConstraints { margin: 0 0 18px; }
+    .forced-letter-row, .forced-word-row { display: flex; justify-content: center; gap: 18px; margin: 7px 0; }
+    .forced-letter-row input, .forced-word { padding: 8px; border: 0; border-radius: 7px; text-transform: uppercase; }
+    .forced-step { width: 48px; }
+    .forced-letters { width: 100px; }
+    .forced-word { width: 180px; }
+    #chainPathControls { display: flex; justify-content: center; align-items: center; gap: 12px; margin-top: 14px; }
+    #finderMore { margin-top: 24px; }
+    #finderStatus { min-height: 24px; color: #f39c12; font-weight: bold; }
+    #chainPath { margin: 15px auto 25px; padding: 18px; border: 2px solid #9b59b6; border-radius: 12px; background: rgba(155,89,182,.16); }
+    .chain-title { margin-bottom: 14px; color: #d7bde2; font-weight: bold; letter-spacing: 1px; }
+    .chain-tiles { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 7px; }
+    .chain-path-list { display: grid; gap: 14px; }
+    .chain-path-number { color: #d7bde2; font-weight: bold; min-width: 28px; }
+    .chain-word-tiles { display: flex; gap: 2px; padding: 6px; border-radius: 8px; background: rgba(0,0,0,.22); }
+    .chain-word-tiles .added { background: #9b59b6; color: white; box-shadow: 0 2px 0 #6c3483; }
+    .chain-word-tiles .removed { background: #9b59b6; color: white; box-shadow: 0 2px 0 #6c3483; opacity: .72; text-decoration: line-through; }
+    .removed-tag { align-self: center; margin-left: 5px; color: #d7bde2; font-weight: bold; }
+    .chain-arrow { color: #d7bde2; padding: 0 4px; font-size: 1.5rem; font-weight: bold; }
+    @media (max-width: 600px) { .finder-form, .chain-controls { flex-direction: column; align-items: center; } .finder-form input { width: 85%; } }
+</style>
+{% endblock %}

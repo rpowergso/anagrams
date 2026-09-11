@@ -1,6 +1,7 @@
 let soloInterval = null;
 let soloAutoDraw = false;
 let countdownInterval = null;
+let soloSubmissionPending = false;
 
 function setSoloCountdown(ms) {
     const display = document.getElementById('solo-countdown');
@@ -98,8 +99,17 @@ async function checkWord() {
     const resultEl = document.getElementById('result');
     const word = input.value.toUpperCase().trim();
     if (word.length < 3) return;
+    if (soloSubmissionPending) return;
+    if (myWords.some(existing => existing.toUpperCase() === word)) {
+        if (resultEl) resultEl.innerText = "Already played!";
+        return;
+    }
 
-    if (canMakeWord(word, activeTiles)) {
+    soloSubmissionPending = true;
+    input.disabled = true;
+
+    try {
+      if (canMakeWord(word, activeTiles)) {
         const response = await fetch('/check-word', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -117,7 +127,7 @@ async function checkWord() {
             input.value = '';
             if (resultEl) resultEl.innerText = "Not a word!";
         }
-    } else {
+      } else {
         const steal = await canStealWord(word, myWords, activeTiles);
         if (steal) {
             const response = await fetch('/check-word', {
@@ -142,6 +152,11 @@ async function checkWord() {
             input.value = '';
             if (resultEl) resultEl.innerText = "Can't make that!";
         }
+      }
+    } finally {
+        soloSubmissionPending = false;
+        input.disabled = false;
+        input.focus();
     }
 }
 
