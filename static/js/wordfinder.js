@@ -233,7 +233,7 @@ finderMore.addEventListener('click', () => loadRange(shownThrough + 1, shownThro
 
 chainMode.addEventListener('change', () => {
     finderResults.classList.toggle('chain-mode', chainMode.checked);
-    findBiggest.hidden = !chainMode.checked || reverseMode.checked;
+    updateChainAction();
     if (sourceLetters) finderForm.requestSubmit();
 });
 
@@ -244,9 +244,14 @@ chainStep.addEventListener('change', () => {
 
 reverseMode.addEventListener('change', () => {
     chainPath.hidden = true;
-    findBiggest.hidden = !chainMode.checked || reverseMode.checked;
+    updateChainAction();
     if (sourceLetters) finderForm.requestSubmit();
 });
+
+function updateChainAction() {
+    findBiggest.hidden = !chainMode.checked;
+    findBiggest.textContent = reverseMode.checked ? 'FIND SMALLEST WORD' : 'FIND BIGGEST WORD';
+}
 
 findBiggest.addEventListener('click', async () => {
     sourceLetters = finderInput.value.trim().toUpperCase();
@@ -257,7 +262,13 @@ findBiggest.addEventListener('click', async () => {
     finderResults.innerHTML = '';
     chainPath.hidden = true;
     finderMore.hidden = true;
-    const maximum = 15 - sourceLetters.length;
+    const maximum = reverseMode.checked ? sourceLetters.length - 3 : 15 - sourceLetters.length;
+    if (maximum < 1) {
+        finderStatus.textContent = reverseMode.checked
+            ? 'This is already the smallest possible game-word length.'
+            : 'This word is already at the maximum length.';
+        return;
+    }
     await loadRange(1, maximum, true);
     finderMore.hidden = true;
 });
