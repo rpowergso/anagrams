@@ -45,3 +45,11 @@ LETTER_WEIGHTS = {
     'K': 1, 'L': 4, 'M': 2, 'N': 6, 'O': 8, 'P': 2, 'Q': 1, 'R': 6, 'S': 4, 'T': 6,
     'U': 4, 'V': 2, 'W': 2, 'X': 1, 'Y': 2, 'Z': 1
 }
+
+# Official 144-tile Bananagrams letter distribution.
+BANANAGRAMS_LETTER_COUNTS = {
+    'A': 13, 'B': 3, 'C': 3, 'D': 6, 'E': 18, 'F': 3, 'G': 4, 'H': 3,
+    'I': 12, 'J': 2, 'K': 2, 'L': 5, 'M': 3, 'N': 8, 'O': 11, 'P': 3,
+    'Q': 2, 'R': 9, 'S': 6, 'T': 9, 'U': 6, 'V': 3, 'W': 3, 'X': 2,
+    'Y': 3, 'Z': 2
+}

@@ -8,6 +8,8 @@ let hasVotedToEnd = false; // Did I vote to end?
 let playerReadyState = false; // Track my ready state
 let countdownActive = false; // Track if final countdown is active
 let playerLockedOut = false; // Track if player is locked out during countdown
+let silencedUntil = 0;
+let silenceTimerInterval = null;
 let lastSubmittedWord = null;
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -103,6 +105,11 @@ socket.on('error_message', (data) => {
     }
 });
 
+socket.on('silenced', (data) => {
+    lastSubmittedWord = null;
+    startSilenceTimer(data.seconds, data.msg);
+});
+
 socket.on('player_action', (data) => {
     showActionMessage(data.message);
 });
@@ -122,11 +129,27 @@ function toggleReady() {
 function updateSettings() {
     const maxTiles = document.getElementById('setting-tiles').value;
     const drawTime = document.getElementById('setting-timer').value;
+    const tilePreset = document.getElementById('setting-preset').value;
     socket.emit('update_settings', {
         room: ROOM_ID,
+        tile_preset: tilePreset,
         max_tiles: maxTiles,
         draw_time: drawTime
     });
+}
+
+function applyTilePreset() {
+    const preset = document.getElementById('setting-preset').value;
+    const tileInput = document.getElementById('setting-tiles');
+    const presetCounts = { standard: 60, bananagrams: 144 };
+    if (presetCounts[preset]) tileInput.value = presetCounts[preset];
+    tileInput.disabled = preset !== 'custom';
+    updateSettings();
+}
+
+function useCustomTileCount() {
+    document.getElementById('setting-preset').value = 'custom';
+    updateSettings();
 }
 
 function startGame() {
@@ -176,6 +199,16 @@ function renderLobby(data) {
     
     if (hostControls) hostControls.style.display = amIHost ? 'block' : 'none';
     if (startBtn) startBtn.style.display = amIHost ? 'inline-block' : 'none';
+
+    const presetInput = document.getElementById('setting-preset');
+    const tileInput = document.getElementById('setting-tiles');
+    const timerInput = document.getElementById('setting-timer');
+    if (presetInput && tileInput && timerInput && data.settings) {
+        presetInput.value = data.settings.tile_preset || 'custom';
+        tileInput.value = data.settings.max_tiles;
+        tileInput.disabled = presetInput.value !== 'custom';
+        timerInput.value = data.settings.draw_time;
+    }
 
     // List players
     Object.entries(data.players).forEach(([sid, player]) => {
@@ -566,17 +599,18 @@ function showSmallCountdown() {
     }, 1000);
 }
 
-function lockTextInput() {
+function lockTextInput(placeholder = 'Game ending...') {
     const input = document.getElementById('wordInput');
     if (input) {
         input.disabled = true;
         input.style.opacity = '0.5';
         input.style.cursor = 'not-allowed';
-        input.placeholder = 'Game ending...';
+        input.placeholder = placeholder;
     }
 }
 
 function unlockTextInput() {
+    if (countdownActive || Date.now() < silencedUntil) return;
     const input = document.getElementById('wordInput');
     if (input) {
         input.disabled = false;
@@ -584,6 +618,34 @@ function unlockTextInput() {
         input.style.cursor = 'text';
         input.placeholder = 'Type word...';
     }
+}
+
+function startSilenceTimer(seconds, message) {
+    clearInterval(silenceTimerInterval);
+    silencedUntil = Date.now() + (seconds * 1000);
+    playerLockedOut = true;
+
+    const updateSilenceUI = () => {
+        const secondsLeft = Math.max(0, Math.ceil((silencedUntil - Date.now()) / 1000));
+        const msgDiv = document.getElementById('statusMessage');
+        if (secondsLeft > 0) {
+            lockTextInput(`Silenced (${secondsLeft}s)`);
+            if (msgDiv) {
+                msgDiv.innerText = message || `Too many incorrect attempts. Silenced for ${secondsLeft}s.`;
+                msgDiv.style.color = '#e74c3c';
+            }
+            return;
+        }
+
+        clearInterval(silenceTimerInterval);
+        silencedUntil = 0;
+        playerLockedOut = countdownActive;
+        unlockTextInput();
+        if (msgDiv && !countdownActive) msgDiv.innerText = '';
+    };
+
+    updateSilenceUI();
+    silenceTimerInterval = setInterval(updateSilenceUI, 250);
 }
 
 function showActionMessage(message) {

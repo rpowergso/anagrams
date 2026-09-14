@@ -9,7 +9,8 @@ from wordfreq import zipf_frequency
 
 from constants import (
     BOT_DIFFICULTIES, 
-    LETTER_WEIGHTS, 
+    LETTER_WEIGHTS,
+    BANANAGRAMS_LETTER_COUNTS,
     MIN_WORD_LENGTH, 
     TILE_COUNT, 
     COMMON_WORD_THRESHOLD, 
@@ -315,9 +316,10 @@ def get_hints(active_tiles, board_words):
         'big_hint': big_hint
     }
 
-def generate_tiles(count=TILE_COUNT):
+def generate_tiles(count=TILE_COUNT, preset='standard'):
+    weights = BANANAGRAMS_LETTER_COUNTS if preset == 'bananagrams' else LETTER_WEIGHTS
     pool = []
-    for letter, c in LETTER_WEIGHTS.items():
+    for letter, c in weights.items():
         pool.extend([letter] * c)
     random.shuffle(pool)
     return pool[:count]

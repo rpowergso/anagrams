@@ -1,12 +1,46 @@
-# multiplayer.py
+import math
+import time
+from collections import Counter
+
 from flask import request
 from flask_socketio import emit, join_room
+
 from app import socketio
 from game import generate_tiles, check_dictionary, same_root
-from collections import Counter
-import time
 
 rooms = {}
+SILENCE_DURATION_SECONDS = 15
+
+
+def incorrect_attempt_limit(game):
+    """Allow more misses as more tiles are revealed, without enabling spam."""
+    revealed_tiles = len(game['active_pool']) + sum(
+        len(word)
+        for player in game['players'].values()
+        for word in player['words']
+    )
+    return max(7, min(12, 6 + math.ceil(revealed_tiles / 12)))
+
+
+def reject_word(game, sid, message):
+    player = game['players'][sid]
+    player['incorrect_attempts'] = player.get('incorrect_attempts', 0) + 1
+    limit = incorrect_attempt_limit(game)
+
+    if player['incorrect_attempts'] >= limit:
+        player['incorrect_attempts'] = 0
+        player['silenced_until'] = time.time() + SILENCE_DURATION_SECONDS
+        emit('silenced', {
+            'seconds': SILENCE_DURATION_SECONDS,
+            'msg': f'Too many incorrect attempts. Silenced for {SILENCE_DURATION_SECONDS} seconds.'
+        }, room=sid)
+        return
+
+    attempts_left = limit - player['incorrect_attempts']
+    attempt_suffix = '' if attempts_left == 1 else 's'
+    emit('error_message', {
+        'msg': f'{message} ({attempts_left} incorrect attempt{attempt_suffix} left)'
+    }, room=sid)
 
 def can_make_word(target_word, source_letters):
     target_count = Counter(target_word.upper())
@@ -26,7 +60,7 @@ def on_join(data):
         rooms[room] = {
             'status': 'lobby',
             'host_sid': request.sid,
-            'settings': {'max_tiles': 60, 'draw_time': 7},
+            'settings': {'tile_preset': 'standard', 'max_tiles': 60, 'draw_time': 7},
             'tiles': [],
             'active_pool': [],
             'turn_index': 0,
@@ -44,6 +78,8 @@ def on_join(data):
         'words': [],
         'score': 0,
         'ready': False,
+        'incorrect_attempts': 0,
+        'silenced_until': 0,
         'is_host': (request.sid == game['host_sid'])
     }
     if request.sid not in game['player_order']:
@@ -66,22 +102,29 @@ def on_claim_word(data):
     if game['status'] != 'playing':
         emit('error_message', {'msg': 'Game is not in progress!'}, room=sid)
         return
-    
-    if len(word) < 3:
-        emit('error_message', {'msg': 'Word must be at least 3 letters!'}, room=sid)
-        return
 
-    if not check_dictionary(word):
-        emit('error_message', {'msg': 'Not a valid dictionary word!'}, room=sid)
-        return
-
-    # Ensure player exists in game
     if sid not in game['players']:
         emit('error_message', {'msg': 'Player not found in game!'}, room=sid)
         return
 
+    silence_remaining = math.ceil(game['players'][sid].get('silenced_until', 0) - time.time())
+    if silence_remaining > 0:
+        emit('silenced', {
+            'seconds': silence_remaining,
+            'msg': f'You are silenced for {silence_remaining} more seconds.'
+        }, room=sid)
+        return
+    
+    if len(word) < 3:
+        reject_word(game, sid, 'Word must be at least 3 letters!')
+        return
+
+    if not check_dictionary(word):
+        reject_word(game, sid, 'Not a valid dictionary word!')
+        return
+
     if any(word in player['words'] for player in game['players'].values()):
-        emit('error_message', {'msg': 'That word is already on the board!'}, room=sid)
+        reject_word(game, sid, 'That word is already on the board!')
         return
 
     # 1. Try to take from pool only
@@ -91,6 +134,7 @@ def on_claim_word(data):
             game['active_pool'].remove(char)
         game['players'][sid]['words'].append(word)
         game['players'][sid]['score'] += (len(word) - 2)
+        game['players'][sid]['incorrect_attempts'] = 0
         
         # Broadcast action
         player_name = game['players'][sid]['username']
@@ -127,6 +171,7 @@ def on_claim_word(data):
                 
                 game['players'][sid]['words'].append(word)
                 game['players'][sid]['score'] += (len(word) - 2)
+                game['players'][sid]['incorrect_attempts'] = 0
                 
                 # Broadcast action
                 stealer_name = game['players'][sid]['username']
@@ -138,15 +183,26 @@ def on_claim_word(data):
                 emit('update_board', game, room=room)
                 return
 
-    emit('error_message', {'msg': 'Cannot form word with available tiles'}, room=sid)
+    reject_word(game, sid, 'Cannot form word with available tiles')
 
 @socketio.on('update_settings')
 def on_update_settings(data):
     room = data['room']
     game = rooms.get(room)
     if game and request.sid == game['host_sid']:
-        game['settings']['max_tiles'] = int(data['max_tiles'])
-        game['settings']['draw_time'] = int(data['draw_time'])
+        preset = data.get('tile_preset', 'custom')
+        if preset not in ('standard', 'bananagrams', 'custom'):
+            preset = 'custom'
+        preset_counts = {'standard': 60, 'bananagrams': 144}
+        try:
+            custom_count = int(data.get('max_tiles', 60))
+            draw_time = int(data.get('draw_time', 7))
+        except (TypeError, ValueError):
+            emit('error_message', {'msg': 'Invalid game settings.'}, room=request.sid)
+            return
+        game['settings']['tile_preset'] = preset
+        game['settings']['max_tiles'] = preset_counts.get(preset, max(20, min(144, custom_count)))
+        game['settings']['draw_time'] = max(3, min(20, draw_time))
         emit('lobby_update', game, room=room)
 
 @socketio.on('toggle_ready')
@@ -177,7 +233,10 @@ def on_start(data):
         return
     
     game['status'] = 'playing'
-    game['tiles'] = generate_tiles(game['settings']['max_tiles'])
+    game['tiles'] = generate_tiles(
+        game['settings']['max_tiles'],
+        preset=game['settings'].get('tile_preset', 'standard')
+    )
     game['end_game_votes'] = {}  # Initialize end game votes
     emit('game_start', game, room=room)
 

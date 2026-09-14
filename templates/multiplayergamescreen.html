@@ -16,10 +16,19 @@
     <!-- HOST ONLY SETTINGS -->
     <div id="host-controls" style="display: none; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; margin-bottom: 25px; border: 1px dashed rgba(255,255,255,0.2);">
         <h3 style="margin-top: 0; font-size: 0.9rem; color: #f1c40f;">HOST SETTINGS 👑</h3>
-        <div style="display: flex; justify-content: space-around; gap: 15px;">
+        <div style="display: flex; justify-content: space-around; gap: 15px; flex-wrap: wrap;">
             <div style="flex: 1;">
-                <label style="display: block; font-size: 0.8rem; margin-bottom: 5px;">TOTAL TILES</label>
-                <input type="number" id="setting-tiles" value="60" min="20" max="100" onchange="updateSettings()" 
+                <label for="setting-preset" style="display: block; font-size: 0.8rem; margin-bottom: 5px;">TILE SET</label>
+                <select id="setting-preset" onchange="applyTilePreset()"
+                        style="width: 90%; padding: 8px; border-radius: 5px; border: none; text-align: center; font-weight: bold;">
+                    <option value="standard">STANDARD (60)</option>
+                    <option value="bananagrams">BANANAGRAMS (144)</option>
+                    <option value="custom">CUSTOM</option>
+                </select>
+            </div>
+            <div style="flex: 1;">
+                <label for="setting-tiles" style="display: block; font-size: 0.8rem; margin-bottom: 5px;">TOTAL TILES</label>
+                <input type="number" id="setting-tiles" value="60" min="20" max="144" onchange="useCustomTileCount()"
                        style="width: 80%; padding: 8px; border-radius: 5px; border: none; text-align: center; font-weight: bold;">
             </div>
             <div style="flex: 1;">
