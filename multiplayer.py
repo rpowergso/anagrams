@@ -54,6 +54,11 @@ def reject_word(game, sid, message):
         'msg': f'{message} ({attempts_left} incorrect attempt{attempt_suffix} left)'
     }, room=sid)
 
+
+def give_word_winner_next_draw(game, sid):
+    if game['settings'].get('word_winner_draws_next') and sid in game['player_order']:
+        game['turn_index'] = game['player_order'].index(sid)
+
 def can_make_word(target_word, source_letters):
     target_count = Counter(target_word.upper())
     source_count = Counter(source_letters)
@@ -76,8 +81,9 @@ def on_join(data):
             'settings': {
                 'tile_preset': 'standard',
                 'max_tiles': 60,
-                'draw_time': 7,
-                'incorrect_word_penalty': True
+                'draw_time': 20,
+                'incorrect_word_penalty': True,
+                'word_winner_draws_next': False
             },
             'tiles': [],
             'active_pool': [],
@@ -181,6 +187,7 @@ def on_claim_word(data):
         game['players'][sid]['words'].append(word)
         game['players'][sid]['score'] += (len(word) - 2)
         game['players'][sid]['incorrect_attempts'] = 0
+        give_word_winner_next_draw(game, sid)
         
         # Broadcast action
         player_name = game['players'][sid]['username']
@@ -198,6 +205,9 @@ def on_claim_word(data):
             combined_letters = list(existing_word.upper()) + game['active_pool']
             
             if can_make_word(word, combined_letters):
+                # A steal must retain every letter from the word being stolen.
+                if not can_make_word(existing_word, word): continue
+
                 # Rules: must be longer, and not same root
                 if len(word) <= len(existing_word): continue
                 if same_root(word, existing_word): continue
@@ -218,6 +228,7 @@ def on_claim_word(data):
                 game['players'][sid]['words'].append(word)
                 game['players'][sid]['score'] += (len(word) - 2)
                 game['players'][sid]['incorrect_attempts'] = 0
+                give_word_winner_next_draw(game, sid)
                 
                 # Broadcast action
                 stealer_name = game['players'][sid]['username']
@@ -242,7 +253,7 @@ def on_update_settings(data):
         preset_counts = {'standard': 60, 'bananagrams': 144}
         try:
             custom_count = int(data.get('max_tiles', 60))
-            draw_time = int(data.get('draw_time', 7))
+            draw_time = int(data.get('draw_time', 20))
         except (TypeError, ValueError):
             emit('error_message', {'msg': 'Invalid game settings.'}, room=request.sid)
             return
@@ -255,6 +266,13 @@ def on_update_settings(data):
         )
         game['settings']['incorrect_word_penalty'] = (
             penalty_value is True or str(penalty_value).lower() == 'true'
+        )
+        winner_draw_value = data.get(
+            'word_winner_draws_next',
+            game['settings'].get('word_winner_draws_next', False)
+        )
+        game['settings']['word_winner_draws_next'] = (
+            winner_draw_value is True or str(winner_draw_value).lower() == 'true'
         )
         emit('lobby_update', game, room=room)
 

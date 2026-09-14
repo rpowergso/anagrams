@@ -15,6 +15,7 @@ let playerLockedOut = false; // Track if player is locked out during countdown
 let silencedUntil = 0;
 let silenceTimerInterval = null;
 let lastSubmittedWord = null;
+const boardDefinitionCache = new Map();
 
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Show custom username popup
@@ -165,12 +166,14 @@ function updateSettings() {
     const drawTime = document.getElementById('setting-timer').value;
     const tilePreset = document.getElementById('setting-preset').value;
     const incorrectWordPenalty = document.getElementById('setting-penalty').value;
+    const wordWinnerDrawsNext = document.getElementById('setting-winner-draws').value;
     socket.emit('update_settings', {
         room: ROOM_ID,
         tile_preset: tilePreset,
         max_tiles: maxTiles,
         draw_time: drawTime,
-        incorrect_word_penalty: incorrectWordPenalty
+        incorrect_word_penalty: incorrectWordPenalty,
+        word_winner_draws_next: wordWinnerDrawsNext
     });
 }
 
@@ -241,15 +244,18 @@ function renderLobby(data) {
     const tileInput = document.getElementById('setting-tiles');
     const timerInput = document.getElementById('setting-timer');
     const penaltyInput = document.getElementById('setting-penalty');
-    if (presetInput && tileInput && timerInput && penaltyInput && data.settings) {
+    const winnerDrawsInput = document.getElementById('setting-winner-draws');
+    if (presetInput && tileInput && timerInput && penaltyInput && winnerDrawsInput && data.settings) {
         presetInput.value = data.settings.tile_preset || 'custom';
         tileInput.value = data.settings.max_tiles;
         timerInput.value = data.settings.draw_time;
         penaltyInput.value = data.settings.incorrect_word_penalty === false ? 'false' : 'true';
+        winnerDrawsInput.value = data.settings.word_winner_draws_next === true ? 'true' : 'false';
         presetInput.disabled = !amIHost;
         tileInput.disabled = !amIHost || presetInput.value !== 'custom';
         timerInput.disabled = !amIHost;
         penaltyInput.disabled = !amIHost;
+        winnerDrawsInput.disabled = !amIHost;
     }
 
     // List players
@@ -381,10 +387,10 @@ function renderPlayers(players) {
         section.style.opacity = player.connected === false ? '0.55' : '1';
 
         const wordsHtml = player.words.map(w => `
-            <div class="word-block">
+            <button type="button" class="word-block board-word-button" onclick="showBoardWordDefinition('${w}')" title="Show definition of ${w}">
                 ${w.split('').map(char => `<div class="tile small">${char}</div>`).join('')}
                 <span class="word-score-tag">${w.length - 2}</span>
-            </div>
+            </button>
         `).join('');
 
         section.innerHTML = `
@@ -524,6 +530,46 @@ function showGameOverScreen(data) {
     `;
     
     document.body.appendChild(modal);
+}
+
+async function showBoardWordDefinition(word) {
+    const modal = document.getElementById('board-definition-modal');
+    const title = document.getElementById('board-definition-title');
+    const body = document.getElementById('board-definition-body');
+    title.textContent = word;
+    body.textContent = 'Loading definition...';
+    modal.hidden = false;
+
+    try {
+        let data = boardDefinitionCache.get(word);
+        if (!data) {
+            const response = await fetch(`/definition/${encodeURIComponent(word.toLowerCase())}`);
+            if (!response.ok) throw new Error('Definition unavailable');
+            data = await response.json();
+            if (boardDefinitionCache.size >= 100) {
+                boardDefinitionCache.delete(boardDefinitionCache.keys().next().value);
+            }
+            boardDefinitionCache.set(word, data);
+        }
+
+        const list = document.createElement('ol');
+        for (const item of data.definitions || []) {
+            const row = document.createElement('li');
+            const label = document.createElement('strong');
+            label.textContent = item.partOfSpeech ? `${item.partOfSpeech}: ` : '';
+            row.append(label, document.createTextNode(item.definition));
+            list.appendChild(row);
+        }
+        body.replaceChildren();
+        if (data.isWord && list.children.length) body.appendChild(list);
+        else body.textContent = 'No definition found.';
+    } catch (error) {
+        body.textContent = 'Definition unavailable right now.';
+    }
+}
+
+function closeBoardWordDefinition() {
+    document.getElementById('board-definition-modal').hidden = true;
 }
 
 function requestReplay() {
