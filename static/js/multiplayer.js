@@ -1,6 +1,10 @@
 const socket = io();
-let myUsername = "";
+let myUsername = sessionStorage.getItem('anagramsMultiplayerUsername') || "";
 let mySid = "";
+let joinedSocketId = "";
+const reconnectToken = sessionStorage.getItem('anagramsReconnectToken') ||
+    (window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`);
+sessionStorage.setItem('anagramsReconnectToken', reconnectToken);
 let isMyTurn = false;
 let drawTimerInterval = null;
 let endGameVotes = {}; // Track who voted to end the game
@@ -14,7 +18,11 @@ let lastSubmittedWord = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Show custom username popup
-    showUsernamePopup();
+    if (myUsername) {
+        joinCurrentSocket();
+    } else {
+        showUsernamePopup();
+    }
 
     // 2. Input Listeners
     const wordInput = document.getElementById('wordInput');
@@ -38,8 +46,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // Capture my Socket ID when connected
     socket.on('connect', () => {
         mySid = socket.id;
+        joinCurrentSocket();
     });
 });
+
+function joinCurrentSocket() {
+    if (!myUsername || !socket.connected || joinedSocketId === socket.id) return;
+    joinedSocketId = socket.id;
+    socket.emit('join', {
+        room: ROOM_ID,
+        username: myUsername,
+        reconnect_token: reconnectToken
+    });
+}
 
 /* --- END GAME EVENTS --- */
 
@@ -243,8 +262,11 @@ function renderLobby(data) {
         item.style.borderRadius = '8px';
         item.style.display = 'flex';
         item.style.justifyContent = 'space-between';
+        item.style.opacity = player.connected === false ? '0.55' : '1';
         
-        const readyText = player.ready ? 
+        const readyText = player.connected === false
+            ? '<span style="color: #95a5a6;">GHOST — RECONNECTING</span>'
+            : player.ready ?
             '<span style="color: #2ecc71;">READY</span>' : 
             '<span style="color: #e74c3c;">WAITING</span>';
             
@@ -356,6 +378,7 @@ function renderPlayers(players) {
         section.style.padding = '20px';
         section.style.borderRadius = '15px';
         section.style.border = isMe ? '2px solid #3498db' : '1px solid rgba(255,255,255,0.1)';
+        section.style.opacity = player.connected === false ? '0.55' : '1';
 
         const wordsHtml = player.words.map(w => `
             <div class="word-block">
@@ -366,7 +389,7 @@ function renderPlayers(players) {
 
         section.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h3 style="margin: 0; color: ${isMe ? '#3498db' : 'white'}">${player.username}</h3>
+                <h3 style="margin: 0; color: ${isMe ? '#3498db' : 'white'}">${player.username}${player.connected === false ? ' · GHOST' : ''}</h3>
                 <div class="score-badge" style="font-size: 1.8rem;">${player.score || 0}</div>
             </div>
             <div class="words-container" style="display: flex; flex-wrap: wrap; gap: 10px;">
@@ -549,13 +572,14 @@ function confirmUsername() {
     const input = document.getElementById('username-input');
     const username = input.value.trim() || "Player_" + Math.floor(Math.random() * 1000);
     myUsername = username;
+    sessionStorage.setItem('anagramsMultiplayerUsername', myUsername);
     
     // Remove modal
     const modals = document.querySelectorAll('div[style*="z-index: 10000"]');
     modals.forEach(m => m.remove());
     
-    // Emit join event
-    socket.emit('join', { room: ROOM_ID, username: myUsername });
+    // Join with a stable token so reconnects restore this player.
+    joinCurrentSocket();
     
 }
 

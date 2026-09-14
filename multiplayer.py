@@ -10,6 +10,14 @@ from game import generate_tiles, check_dictionary, same_root
 
 rooms = {}
 SILENCE_DURATION_SECONDS = 7
+GHOST_GRACE_SECONDS = 60
+reconnect_tokens = {}
+sid_tokens = {}
+
+
+def emit_room_state(game, room):
+    event = 'lobby_update' if game['status'] == 'lobby' else 'update_board'
+    socketio.emit(event, game, room=room)
 
 
 def incorrect_attempt_limit(game):
@@ -58,6 +66,7 @@ def can_make_word(target_word, source_letters):
 def on_join(data):
     room = data['room']
     username = data.get('username', 'Anonymous')
+    reconnect_token = str(data.get('reconnect_token', '')).strip()
     join_room(room)
     
     if room not in rooms:
@@ -78,6 +87,28 @@ def on_join(data):
         }
     
     game = rooms[room]
+    previous_connection = reconnect_tokens.get(reconnect_token) if reconnect_token else None
+    if previous_connection and previous_connection['room'] == room:
+        previous_sid = previous_connection['sid']
+        if previous_sid in game['players']:
+            player = game['players'].pop(previous_sid)
+            player['connected'] = True
+            player['disconnected_at'] = None
+            game['players'][request.sid] = player
+            game['player_order'] = [
+                request.sid if sid == previous_sid else sid
+                for sid in game['player_order']
+            ]
+            if game['host_sid'] == previous_sid:
+                game['host_sid'] = request.sid
+            if previous_sid in game.get('end_game_votes', {}):
+                game['end_game_votes'][request.sid] = game['end_game_votes'].pop(previous_sid)
+            sid_tokens.pop(previous_sid, None)
+            sid_tokens[request.sid] = reconnect_token
+            reconnect_tokens[reconnect_token] = {'room': room, 'sid': request.sid}
+            emit_room_state(game, room)
+            return
+
     if game['status'] == 'playing':
         emit('error_message', {'msg': 'Game already in progress'}, room=request.sid)
         return
@@ -89,8 +120,13 @@ def on_join(data):
         'ready': False,
         'incorrect_attempts': 0,
         'silenced_until': 0,
+        'connected': True,
+        'disconnected_at': None,
         'is_host': (request.sid == game['host_sid'])
     }
+    if reconnect_token:
+        sid_tokens[request.sid] = reconnect_token
+        reconnect_tokens[reconnect_token] = {'room': room, 'sid': request.sid}
     if request.sid not in game['player_order']:
         game['player_order'].append(request.sid)
     
@@ -244,7 +280,10 @@ def on_start(data):
         return
     
     # Check if EVERYONE is ready (including host)
-    all_ready = all(p['ready'] for sid, p in game['players'].items())
+    all_ready = all(
+        p['ready'] and p.get('connected', True)
+        for p in game['players'].values()
+    )
     if not all_ready:
         emit('error_message', {'msg': 'Not everyone is ready!'}, room=request.sid)
         return
@@ -357,3 +396,56 @@ def on_replay_game(data):
         player['silenced_until'] = 0
 
     emit('lobby_update', game, room=room)
+
+
+@socketio.on('disconnect')
+def on_disconnect():
+    sid = request.sid
+    reconnect_token = sid_tokens.pop(sid, None)
+    if not reconnect_token:
+        return
+    connection = reconnect_tokens.get(reconnect_token)
+    if not connection:
+        return
+    room = connection['room']
+    game = rooms.get(room)
+    if not game or sid not in game['players']:
+        return
+
+    disconnected_at = time.time()
+    game['players'][sid]['connected'] = False
+    game['players'][sid]['disconnected_at'] = disconnected_at
+    emit_room_state(game, room)
+    socketio.start_background_task(
+        remove_expired_ghost, room, sid, reconnect_token, disconnected_at
+    )
+
+
+def remove_expired_ghost(room, sid, reconnect_token, disconnected_at):
+    socketio.sleep(GHOST_GRACE_SECONDS)
+    game = rooms.get(room)
+    if not game:
+        return
+    player = game['players'].get(sid)
+    if not player or player.get('connected') or player.get('disconnected_at') != disconnected_at:
+        return
+
+    game['players'].pop(sid, None)
+    connection = reconnect_tokens.get(reconnect_token)
+    if connection == {'room': room, 'sid': sid}:
+        reconnect_tokens.pop(reconnect_token, None)
+    game.get('end_game_votes', {}).pop(sid, None)
+    if sid in game['player_order']:
+        removed_index = game['player_order'].index(sid)
+        game['player_order'].remove(sid)
+        if removed_index < game['turn_index']:
+            game['turn_index'] -= 1
+    if not game['player_order']:
+        rooms.pop(room, None)
+        return
+    game['turn_index'] %= len(game['player_order'])
+
+    if game['host_sid'] == sid:
+        game['host_sid'] = game['player_order'][0]
+        game['players'][game['host_sid']]['is_host'] = True
+    emit_room_state(game, room)
