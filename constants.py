@@ -7,7 +7,7 @@ MIN_WORD_LENGTH = 3
 # Zipf frequency > 4.0 is generally considered a "common" word
 COMMON_WORD_THRESHOLD = 4.0 
 
-# Max randomness added/subtracted to the delay (seconds)
+#bot move delay randomness (in seconds)
 RANDOM_JITTER_MAX = 0.5
 
 # Hint system frequency threshold (minimum frequency for "big hint" suggestions)

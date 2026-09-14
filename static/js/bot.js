@@ -7,11 +7,13 @@ function setCountdown(ms) {
     if (!display) return;
     clearInterval(countdownInterval);
     if (ms <= 0) { display.innerText = "READY"; return; }
-    let remaining = ms;
+    let remainingms = ms;
     countdownInterval = setInterval(() => {
-        remaining -= 100;
-        display.innerText = `NEXT DRAW: ${(remaining / 1000).toFixed(1)}s`;
-        if (remaining <= 0) { clearInterval(countdownInterval); display.innerText = "DRAWING..."; }
+        remainingms -= 100;
+        display.innerText = `NEXT DRAW: ${(remainingms / 1000).toFixed(1)}s`;
+        if (remainingms <= 0) {
+            clearInterval(countdownInterval); display.innerText = "DRAWING...";
+        }
     }, 100);
 }
 
