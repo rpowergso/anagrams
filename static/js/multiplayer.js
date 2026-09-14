@@ -68,6 +68,21 @@ socket.on('lobby_update', (data) => {
     
     // Switch visibility if still in lobby
     if (data.status === 'lobby') {
+        const gameOverModal = document.getElementById('game-over-modal');
+        if (gameOverModal) gameOverModal.remove();
+        playerReadyState = false;
+        playerLockedOut = false;
+        countdownActive = false;
+        silencedUntil = 0;
+        hasVotedToEnd = false;
+        lastSubmittedWord = null;
+        clearInterval(silenceTimerInterval);
+        unlockTextInput();
+        const readyBtn = document.getElementById('ready-btn');
+        if (readyBtn) {
+            readyBtn.innerText = 'READY UP';
+            readyBtn.style.background = '';
+        }
         if (lobbyContainer) lobbyContainer.style.display = 'block';
         if (gameContainer) gameContainer.style.display = 'none';
         renderLobby(data);
@@ -130,11 +145,13 @@ function updateSettings() {
     const maxTiles = document.getElementById('setting-tiles').value;
     const drawTime = document.getElementById('setting-timer').value;
     const tilePreset = document.getElementById('setting-preset').value;
+    const incorrectWordPenalty = document.getElementById('setting-penalty').value;
     socket.emit('update_settings', {
         room: ROOM_ID,
         tile_preset: tilePreset,
         max_tiles: maxTiles,
-        draw_time: drawTime
+        draw_time: drawTime,
+        incorrect_word_penalty: incorrectWordPenalty
     });
 }
 
@@ -197,17 +214,23 @@ function renderLobby(data) {
     const hostControls = document.getElementById('host-controls');
     const startBtn = document.getElementById('start-btn');
     
-    if (hostControls) hostControls.style.display = amIHost ? 'block' : 'none';
+    // Everyone can see the room settings; only the host can change them.
+    if (hostControls) hostControls.style.display = 'block';
     if (startBtn) startBtn.style.display = amIHost ? 'inline-block' : 'none';
 
     const presetInput = document.getElementById('setting-preset');
     const tileInput = document.getElementById('setting-tiles');
     const timerInput = document.getElementById('setting-timer');
-    if (presetInput && tileInput && timerInput && data.settings) {
+    const penaltyInput = document.getElementById('setting-penalty');
+    if (presetInput && tileInput && timerInput && penaltyInput && data.settings) {
         presetInput.value = data.settings.tile_preset || 'custom';
         tileInput.value = data.settings.max_tiles;
-        tileInput.disabled = presetInput.value !== 'custom';
         timerInput.value = data.settings.draw_time;
+        penaltyInput.value = data.settings.incorrect_word_penalty === false ? 'false' : 'true';
+        presetInput.disabled = !amIHost;
+        tileInput.disabled = !amIHost || presetInput.value !== 'custom';
+        timerInput.disabled = !amIHost;
+        penaltyInput.disabled = !amIHost;
     }
 
     // List players
@@ -416,6 +439,7 @@ function showEndGameCountdown(players) {
 
 function showGameOverScreen(data) {
     const modal = document.createElement('div');
+    modal.id = 'game-over-modal';
     modal.style.cssText = `
         position: fixed;
         top: 0;
@@ -467,13 +491,20 @@ function showGameOverScreen(data) {
             <div style="margin-bottom: 40px;">
                 ${scoresHtml}
             </div>
-            <a href="/homepage" style="text-decoration: none;">
-                <button class="btn btn-green" style="padding: 15px 40px; font-size: 1.2rem;">BACK TO HOME</button>
-            </a>
+            <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+                <button class="btn btn-green" onclick="requestReplay()" style="padding: 15px 40px; font-size: 1.2rem;">PLAY AGAIN</button>
+                <a href="/homepage" style="text-decoration: none;">
+                    <button class="btn btn-leave" style="padding: 15px 40px; font-size: 1.2rem;">BACK TO HOME</button>
+                </a>
+            </div>
         </div>
     `;
     
     document.body.appendChild(modal);
+}
+
+function requestReplay() {
+    socket.emit('replay_game', { room: ROOM_ID });
 }
 
 /* --- CUSTOM UI FUNCTIONS --- */

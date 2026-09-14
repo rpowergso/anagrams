@@ -9,7 +9,7 @@ from app import socketio
 from game import generate_tiles, check_dictionary, same_root
 
 rooms = {}
-SILENCE_DURATION_SECONDS = 15
+SILENCE_DURATION_SECONDS = 7
 
 
 def incorrect_attempt_limit(game):
@@ -23,6 +23,10 @@ def incorrect_attempt_limit(game):
 
 
 def reject_word(game, sid, message):
+    if not game['settings'].get('incorrect_word_penalty', True):
+        emit('error_message', {'msg': message}, room=sid)
+        return
+
     player = game['players'][sid]
     player['incorrect_attempts'] = player.get('incorrect_attempts', 0) + 1
     limit = incorrect_attempt_limit(game)
@@ -60,7 +64,12 @@ def on_join(data):
         rooms[room] = {
             'status': 'lobby',
             'host_sid': request.sid,
-            'settings': {'tile_preset': 'standard', 'max_tiles': 60, 'draw_time': 7},
+            'settings': {
+                'tile_preset': 'standard',
+                'max_tiles': 60,
+                'draw_time': 7,
+                'incorrect_word_penalty': True
+            },
             'tiles': [],
             'active_pool': [],
             'turn_index': 0,
@@ -124,7 +133,8 @@ def on_claim_word(data):
         return
 
     if any(word in player['words'] for player in game['players'].values()):
-        reject_word(game, sid, 'That word is already on the board!')
+        # Losing a race to a word is not an incorrect guess.
+        emit('error_message', {'msg': 'That word is already on the board!'}, room=sid)
         return
 
     # 1. Try to take from pool only
@@ -203,6 +213,13 @@ def on_update_settings(data):
         game['settings']['tile_preset'] = preset
         game['settings']['max_tiles'] = preset_counts.get(preset, max(20, min(144, custom_count)))
         game['settings']['draw_time'] = max(3, min(20, draw_time))
+        penalty_value = data.get(
+            'incorrect_word_penalty',
+            game['settings'].get('incorrect_word_penalty', True)
+        )
+        game['settings']['incorrect_word_penalty'] = (
+            penalty_value is True or str(penalty_value).lower() == 'true'
+        )
         emit('lobby_update', game, room=room)
 
 @socketio.on('toggle_ready')
@@ -317,3 +334,26 @@ def end_game_countdown(room, game):
         'final_scores': final_scores,
         'players': game['players']
     }, room=room)
+
+
+@socketio.on('replay_game')
+def on_replay_game(data):
+    room = data['room']
+    game = rooms.get(room)
+    if not game or request.sid not in game['players'] or game['status'] != 'ended':
+        emit('error_message', {'msg': 'This game cannot be replayed yet.'}, room=request.sid)
+        return
+
+    game['status'] = 'lobby'
+    game['tiles'] = []
+    game['active_pool'] = []
+    game['turn_index'] = 0
+    game['end_game_votes'] = {}
+    for player in game['players'].values():
+        player['words'] = []
+        player['score'] = 0
+        player['ready'] = False
+        player['incorrect_attempts'] = 0
+        player['silenced_until'] = 0
+
+    emit('lobby_update', game, room=room)

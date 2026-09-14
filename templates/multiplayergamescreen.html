@@ -36,6 +36,14 @@
                 <input type="number" id="setting-timer" value="7" min="3" max="20" onchange="updateSettings()"
                        style="width: 80%; padding: 8px; border-radius: 5px; border: none; text-align: center; font-weight: bold;">
             </div>
+            <div style="flex: 1;">
+                <label for="setting-penalty" style="display: block; font-size: 0.8rem; margin-bottom: 5px;">MISTAKE SILENCE</label>
+                <select id="setting-penalty" onchange="updateSettings()"
+                        style="width: 80%; padding: 8px; border-radius: 5px; border: none; text-align: center; font-weight: bold;">
+                    <option value="true">YES</option>
+                    <option value="false">NO</option>
+                </select>
+            </div>
         </div>
     </div>
 
