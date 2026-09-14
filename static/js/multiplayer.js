@@ -259,7 +259,10 @@ function renderLobby(data) {
     }
 
     // List players
-    Object.entries(data.players).forEach(([sid, player]) => {
+    const orderedPlayers = data.player_order
+        .filter(sid => data.players[sid])
+        .map(sid => [sid, data.players[sid]]);
+    orderedPlayers.forEach(([sid, player]) => {
         const item = document.createElement('div');
         item.className = 'lobby-player-item';
         item.style.padding = '10px';
@@ -289,7 +292,7 @@ function updateUI(data) {
     if (countEl) countEl.innerText = data.tiles.length;
     
     renderPool(data.active_pool);
-    renderPlayers(data.players);
+    renderPlayers(data.players, data.player_order);
 
     // Turn Handling
     const currentTurnSid = data.player_order[data.turn_index];
@@ -372,12 +375,15 @@ function renderPool(pool) {
     });
 }
 
-function renderPlayers(players) {
+function renderPlayers(players, playerOrder) {
     const board = document.getElementById('playersBoard');
     if (!board) return;
     board.innerHTML = '';
 
-    for (const [sid, player] of Object.entries(players)) {
+    const orderedPlayers = playerOrder
+        .filter(sid => players[sid])
+        .map(sid => [sid, players[sid]]);
+    for (const [sid, player] of orderedPlayers) {
         const isMe = sid === socket.id;
         const section = document.createElement('section');
         section.style.background = isMe ? 'rgba(52, 152, 219, 0.1)' : 'rgba(0,0,0,0.2)';
