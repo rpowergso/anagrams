@@ -181,7 +181,15 @@ async function loadRange(minAdded, maxAdded, biggestOnly = false) {
                 biggestOnly
             })
         });
-        const data = await response.json();
+        const responseText = await response.text();
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (_error) {
+            throw new Error(response.ok
+                ? 'The search returned an invalid response. Please try again.'
+                : `The search service is temporarily unavailable (${response.status}). Please try again.`);
+        }
         if (!response.ok) throw new Error(data.error || 'Search failed.');
         appendGroups(data.groups);
         if (biggestOnly && !data.groups.length) {

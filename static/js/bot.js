@@ -1,6 +1,8 @@
 let botIsThinking = false;
 let countdownInterval = null;
 let autoDrawMode = false; 
+let autoDrawIntervalMs = typeof AUTODRAW_INTERVAL_MS === 'undefined' ? 3500 : AUTODRAW_INTERVAL_MS;
+let botDrawTimeout = null;
 
 function setCountdown(ms) {
     const display = document.getElementById('countdown-display');
@@ -17,14 +19,45 @@ function setCountdown(ms) {
     }, 100);
 }
 
+function restartAutoDrawInterval() {
+    clearInterval(botInterval);
+    botInterval = setInterval(botDrawTile, autoDrawIntervalMs);
+    setCountdown(autoDrawIntervalMs);
+}
+
+function scheduleManualBotDraw() {
+    clearTimeout(botDrawTimeout);
+    setCountdown(autoDrawIntervalMs);
+    botDrawTimeout = setTimeout(() => {
+        botDrawTimeout = null;
+        botDrawTile();
+    }, autoDrawIntervalMs);
+}
+
+function updateAutoDrawTiming(value) {
+    const requested = Number(value);
+    autoDrawIntervalMs = Math.max(1000, Math.min(30000, requested || 3500));
+    const slider = document.getElementById('autodrawTiming');
+    const output = document.getElementById('autodrawTimingValue');
+    if (slider) slider.value = autoDrawIntervalMs;
+    if (output) output.textContent = `${(autoDrawIntervalMs / 1000).toFixed(1)}s`;
+
+    if (autoDrawMode) {
+        restartAutoDrawInterval();
+    } else if (botDrawTimeout !== null) {
+        scheduleManualBotDraw();
+    }
+}
+
 function toggleAutoDraw() {
     autoDrawMode = !autoDrawMode;
     const btn = document.getElementById('autoDrawBtn');
     if (btn) btn.innerText = `AUTODRAW: ${autoDrawMode ? 'ON' : 'OFF'}`;
     
     if (autoDrawMode) {
-        botInterval = setInterval(botDrawTile, AUTODRAW_INTERVAL_MS);
-        setCountdown(AUTODRAW_INTERVAL_MS);
+        clearTimeout(botDrawTimeout);
+        botDrawTimeout = null;
+        restartAutoDrawInterval();
     } else {
         clearInterval(botInterval);
         botInterval = null;
@@ -56,7 +89,7 @@ async function botDrawTile() {
     requestBotMove();
     
     if (autoDrawMode) {
-        setCountdown(AUTODRAW_INTERVAL_MS);
+        setCountdown(autoDrawIntervalMs);
     } else {
         clearInterval(botInterval);
         botInterval = null;
@@ -82,8 +115,7 @@ async function drawTileForPlayer() {
     if (!autoDrawMode) {
         const drawBtn = document.getElementById('playerDrawButton');
         if (drawBtn) drawBtn.disabled = true;
-        setCountdown(AUTODRAW_INTERVAL_MS);
-        setTimeout(botDrawTile, AUTODRAW_INTERVAL_MS);
+        scheduleManualBotDraw();
     }
     
     // Keep focus on input
@@ -217,6 +249,8 @@ function applyBotMove(move) {
 function stopBot(msg) {
     botRunning = false;
     clearInterval(botInterval);
+    clearTimeout(botDrawTimeout);
+    botDrawTimeout = null;
     clearInterval(countdownInterval);
     setBotStatus(msg);
 }
@@ -260,6 +294,8 @@ async function checkPlayerWord() {
             input.value = '';
             botCancelId++; 
             requestBotMove();
+        } else {
+            setBotStatus(`"${word}" is not in the English dictionary`);
         }
       } else {
         const steal = await canStealWord(word, [...botWords, ...playerWords], activeTiles);
@@ -283,7 +319,11 @@ async function checkPlayerWord() {
                 input.value = '';
                 botCancelId++;
                 requestBotMove();
+            } else {
+                setBotStatus(`"${word}" is not in the English dictionary`);
             }
+        } else {
+            setBotStatus('Cannot make that word with the available tiles.');
         }
       }
     } finally {

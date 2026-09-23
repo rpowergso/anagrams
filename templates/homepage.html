@@ -3,12 +3,12 @@
 <div class="home-shell">
     <!-- The Big "Pretty" Title -->
     <h1 style="font-size: 4.5rem; text-shadow: 0 8px 0 var(--tile-shadow); margin-bottom: 60px; letter-spacing: 4px;">ANAGRAMS</h1>
-    <!-- 3-COLUMN LAYOUT: Multiplayer | Bot (Center) | Solo -->
+    <!-- Multiplayer/bot lobbies and solo modes -->
     <div class="home-top-row">
         
         <!-- LEFT COLUMN: MULTIPLAYER -->
         <div class="menu-card" style="background: rgba(155, 89, 182, 0.05); border: 2px solid rgba(155, 89, 182, 0.2);">
-            <h2 style="color: #9b59b6; letter-spacing: 2px; margin-bottom: 30px;">MULTIPLAYER</h2>
+            <h2 style="color: #9b59b6; letter-spacing: 2px; margin-bottom: 30px;">MULTIPLAYER / BOT</h2>
             
             <!-- Create Room Button -->
             <a href="/create-room" style="text-decoration: none;">
@@ -17,24 +17,12 @@
             
             <!-- Join Room Form -->
             <form action="/join-room" method="POST" style="display: flex; flex-direction: column; gap: 12px;">
-                <input type="text" name="room_id" placeholder="ROOM CODE" 
+                <input type="text" name="room_id" maxlength="4" pattern="[A-Za-z0-9]{4}" placeholder="ROOM CODE"
                        style="width: 100%; padding: 12px 15px; border-radius: 8px; border: 2px solid rgba(155, 89, 182, 0.3); background: rgba(0,0,0,0.2); color: white; font-weight: bold; text-transform: uppercase; outline: none; text-align: center; font-size: 0.95rem; box-sizing: border-box;">
                 <button type="submit" class="btn btn-green" style="width: 100%; padding: 12px; border-radius: 8px;">JOIN ROOM</button>
             </form>
             
-            <p style="margin-top: 20px; opacity: 0.7; font-size: 0.9rem; line-height: 1.6;">Challenge friends in real-time multiplayer matches.</p>
-        </div>
-
-        <!-- CENTER COLUMN: BOT (LARGER) -->
-        <div class="menu-card" style="background: rgba(231, 76, 60, 0.05); border: 2px solid rgba(231, 76, 60, 0.2); transform: scale(1.05);">
-            <h2 style="color: #e74c3c; letter-spacing: 2px; margin-bottom: 30px; font-size: 1.4rem;">VS BOT</h2>
-            <form method="post" action="/botgamescreen" style="display: flex; flex-direction: column; gap: 12px;">
-                <button type="submit" name="difficulty" value="easy" class="btn btn-green" style="background: #27ae60; width: 100%; padding: 14px; border-radius: 8px; font-size: 1.05rem;">EASY</button>
-                <button type="submit" name="difficulty" value="medium" class="btn btn-green" style="background: #f39c12; width: 100%; padding: 14px; border-radius: 8px; font-size: 1.05rem;">MEDIUM</button>
-                <button type="submit" name="difficulty" value="hard" class="btn btn-green" style="background: #e74c3c; width: 100%; padding: 14px; border-radius: 8px; font-size: 1.05rem;">HARD</button>
-                <input type="hidden" name="autodraw" value="off">
-            </form>
-            <p style="margin-top: 20px; opacity: 0.7; font-size: 0.9rem; line-height: 1.6;">Test yourself against an AI opponent at various difficulty levels.</p>
+            <p style="margin-top: 20px; opacity: 0.7; font-size: 0.9rem; line-height: 1.6;">Invite friends or add bots and choose their difficulty inside the lobby.</p>
         </div>
 
         <!-- RIGHT COLUMN: SOLO -->
@@ -66,7 +54,7 @@
 
 <style>
     .home-shell { text-align: center; padding: 50px; }
-    .home-top-row { display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 40px; max-width: 1400px; margin: 0 auto; }
+    .home-top-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px; max-width: 900px; margin: 0 auto; }
     .home-bottom-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px; max-width: 865px; margin: 55px auto 0; }
     .menu-link { display: block; text-decoration: none; padding: 16px; }
     .home-bottom-row p { margin-top: 20px; opacity: .7; font-size: .9rem; line-height: 1.6; }

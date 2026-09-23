@@ -1,10 +1,18 @@
 const socket = io();
-let myUsername = sessionStorage.getItem('anagramsMultiplayerUsername') || "";
+let myUsername = localStorage.getItem('anagramsMultiplayerUsername') ||
+    sessionStorage.getItem('anagramsMultiplayerUsername') || "";
+const safeUsernamePattern = /^[\p{L}\p{N} _.'-]+$/u;
+if (myUsername.length > 24 || !safeUsernamePattern.test(myUsername)) {
+    sessionStorage.removeItem('anagramsMultiplayerUsername');
+    localStorage.removeItem('anagramsMultiplayerUsername');
+    myUsername = "";
+}
 let mySid = "";
 let joinedSocketId = "";
-const reconnectToken = sessionStorage.getItem('anagramsReconnectToken') ||
+const reconnectStorageKey = `anagramsReconnectToken:${ROOM_ID}`;
+const reconnectToken = localStorage.getItem(reconnectStorageKey) ||
     (window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`);
-sessionStorage.setItem('anagramsReconnectToken', reconnectToken);
+localStorage.setItem(reconnectStorageKey, reconnectToken);
 let isMyTurn = false;
 let drawTimerInterval = null;
 let endGameVotes = {}; // Track who voted to end the game
@@ -16,6 +24,14 @@ let silencedUntil = 0;
 let silenceTimerInterval = null;
 let lastSubmittedWord = null;
 const boardDefinitionCache = new Map();
+const boardStealCache = new Map();
+let wordDetailsRequest = 0;
+
+function escapeHtml(value) {
+    const node = document.createElement('span');
+    node.textContent = String(value ?? '');
+    return node.innerHTML;
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Show custom username popup
@@ -49,6 +65,13 @@ document.addEventListener('DOMContentLoaded', () => {
         mySid = socket.id;
         joinCurrentSocket();
     });
+
+    socket.on('disconnect', () => showReconnectNotice());
+    socket.on('connect_error', () => {
+        showReconnectNotice();
+        const status = document.getElementById('rejoin-status');
+        if (status) status.textContent = 'Could not connect yet. Try again.';
+    });
 });
 
 function joinCurrentSocket() {
@@ -57,15 +80,22 @@ function joinCurrentSocket() {
     socket.emit('join', {
         room: ROOM_ID,
         username: myUsername,
-        reconnect_token: reconnectToken
+        reconnect_token: reconnectToken,
+        initial_bot_difficulty: INITIAL_BOT_DIFFICULTY
     });
 }
+
+socket.on('kicked', (data) => {
+    localStorage.removeItem(reconnectStorageKey);
+    alert(data.msg || 'The host removed you from this lobby.');
+    window.location.href = '/homepage';
+});
 
 /* --- END GAME EVENTS --- */
 
 socket.on('end_game_vote', (data) => {
     endGameVotes = data.votes;
-    const votesNeeded = Math.ceil(Object.keys(data.players).length * 2 / 3);
+    const votesNeeded = data.votes_needed || Math.ceil(Object.keys(data.players).length * 2 / 3);
     const votesReceived = Object.values(endGameVotes).filter(v => v).length;
     updateEndGameUI(votesReceived, votesNeeded);
     
@@ -83,6 +113,7 @@ socket.on('game_ended', (data) => {
 /* --- LOBBY EVENTS --- */
 
 socket.on('lobby_update', (data) => {
+    hideReconnectNotice();
     const lobbyContainer = document.getElementById('lobby-container');
     const gameContainer = document.getElementById('game-container');
     
@@ -90,6 +121,7 @@ socket.on('lobby_update', (data) => {
     if (data.status === 'lobby') {
         const gameOverModal = document.getElementById('game-over-modal');
         if (gameOverModal) gameOverModal.remove();
+        setTopReplayVisible(false);
         playerReadyState = false;
         playerLockedOut = false;
         countdownActive = false;
@@ -110,6 +142,8 @@ socket.on('lobby_update', (data) => {
 });
 
 socket.on('game_start', (data) => {
+    hideReconnectNotice();
+    setTopReplayVisible(false);
     const lobbyContainer = document.getElementById('lobby-container');
     const gameContainer = document.getElementById('game-container');
     
@@ -122,11 +156,13 @@ socket.on('game_start', (data) => {
 /* --- GAMEPLAY EVENTS --- */
 
 socket.on('update_board', (data) => {
+    hideReconnectNotice();
     lastSubmittedWord = null;
     updateUI(data);
 });
 
 socket.on('game_state', (data) => {
+    hideReconnectNotice();
     updateUI(data);
 });
 
@@ -164,6 +200,7 @@ function toggleReady() {
 function updateSettings() {
     const maxTiles = document.getElementById('setting-tiles').value;
     const drawTime = document.getElementById('setting-timer').value;
+    const autodrawEnabled = document.getElementById('setting-autodraw').value;
     const tilePreset = document.getElementById('setting-preset').value;
     const incorrectWordPenalty = document.getElementById('setting-penalty').value;
     const wordWinnerDrawsNext = document.getElementById('setting-winner-draws').value;
@@ -172,9 +209,27 @@ function updateSettings() {
         tile_preset: tilePreset,
         max_tiles: maxTiles,
         draw_time: drawTime,
+        autodraw_enabled: autodrawEnabled,
         incorrect_word_penalty: incorrectWordPenalty,
         word_winner_draws_next: wordWinnerDrawsNext
     });
+}
+
+function addBot() {
+    socket.emit('add_bot', { room: ROOM_ID, difficulty: 'medium' });
+}
+
+function removeBot(sid) {
+    socket.emit('remove_bot', { room: ROOM_ID, sid });
+}
+
+function updateBotDifficulty(sid, difficulty) {
+    socket.emit('update_bot_difficulty', { room: ROOM_ID, sid, difficulty });
+}
+
+function kickPlayer(sid, username) {
+    if (!window.confirm(`Remove ${username} from this lobby?`)) return;
+    socket.emit('kick_player', { room: ROOM_ID, sid });
 }
 
 function applyTilePreset() {
@@ -235,25 +290,35 @@ function renderLobby(data) {
     const amIHost = data.host_sid === socket.id;
     const hostControls = document.getElementById('host-controls');
     const startBtn = document.getElementById('start-btn');
+    const addBotBtn = document.getElementById('add-bot-btn');
+    const humanCount = Object.values(data.players).filter(player => !player.is_bot).length;
+    const botCount = Object.values(data.players).filter(player => player.is_bot).length;
     
     // Everyone can see the room settings; only the host can change them.
     if (hostControls) hostControls.style.display = 'block';
     if (startBtn) startBtn.style.display = amIHost ? 'inline-block' : 'none';
+    if (startBtn) startBtn.textContent = humanCount === 1 && botCount === 0 ? 'START ZEN' : 'START GAME';
+    if (addBotBtn) addBotBtn.style.display = amIHost ? 'inline-block' : 'none';
+    const modeLabel = document.getElementById('lobby-mode-label');
+    if (modeLabel) modeLabel.textContent = humanCount === 1 && botCount === 0 ? 'START ALONE FOR ZEN' : 'MULTIPLAYER / BOT';
 
     const presetInput = document.getElementById('setting-preset');
     const tileInput = document.getElementById('setting-tiles');
     const timerInput = document.getElementById('setting-timer');
+    const autodrawInput = document.getElementById('setting-autodraw');
     const penaltyInput = document.getElementById('setting-penalty');
     const winnerDrawsInput = document.getElementById('setting-winner-draws');
-    if (presetInput && tileInput && timerInput && penaltyInput && winnerDrawsInput && data.settings) {
+    if (presetInput && tileInput && timerInput && autodrawInput && penaltyInput && winnerDrawsInput && data.settings) {
         presetInput.value = data.settings.tile_preset || 'custom';
         tileInput.value = data.settings.max_tiles;
         timerInput.value = data.settings.draw_time;
+        autodrawInput.value = data.settings.autodraw_enabled === false ? 'false' : 'true';
         penaltyInput.value = data.settings.incorrect_word_penalty === false ? 'false' : 'true';
         winnerDrawsInput.value = data.settings.word_winner_draws_next === true ? 'true' : 'false';
         presetInput.disabled = !amIHost;
         tileInput.disabled = !amIHost || presetInput.value !== 'custom';
         timerInput.disabled = !amIHost;
+        autodrawInput.disabled = !amIHost;
         penaltyInput.disabled = !amIHost;
         winnerDrawsInput.disabled = !amIHost;
     }
@@ -278,11 +343,27 @@ function renderLobby(data) {
             : player.ready ?
             '<span style="color: #2ecc71;">READY</span>' : 
             '<span style="color: #e74c3c;">WAITING</span>';
-            
+
+        let controls = `<b>${readyText}</b>`;
+        if (player.is_bot) {
+            const difficulty = player.difficulty || 'medium';
+            controls = amIHost ? `
+                <span class="lobby-row-controls">
+                    <select data-bot-difficulty="${escapeHtml(sid)}" aria-label="Bot difficulty">
+                        ${['easy', 'medium', 'hard'].map(level => `<option value="${level}" ${level === difficulty ? 'selected' : ''}>${level.toUpperCase()}</option>`).join('')}
+                    </select>
+                    <button type="button" class="lobby-remove" data-remove-bot="${escapeHtml(sid)}" aria-label="Remove bot">×</button>
+                </span>` : `<b style="color:#e67e22">${escapeHtml(difficulty.toUpperCase())}</b>`;
+        } else if (amIHost && sid !== socket.id) {
+            controls = `<span class="lobby-row-controls">${controls}<button type="button" class="lobby-remove" data-kick-player="${escapeHtml(sid)}" aria-label="Kick player">KICK</button></span>`;
+        }
         item.innerHTML = `
-            <span>${player.username} ${player.is_host ? '👑' : ''}</span>
-            <b>${readyText}</b>
+            <span>${escapeHtml(player.username)} ${player.is_host ? '👑' : ''} ${player.is_bot ? '<small>BOT</small>' : ''}</span>
+            ${controls}
         `;
+        item.querySelector('[data-bot-difficulty]')?.addEventListener('change', event => updateBotDifficulty(sid, event.target.value));
+        item.querySelector('[data-remove-bot]')?.addEventListener('click', () => removeBot(sid));
+        item.querySelector('[data-kick-player]')?.addEventListener('click', () => kickPlayer(sid, player.username));
         playerList.appendChild(item);
     });
 }
@@ -338,15 +419,21 @@ function updateUI(data) {
         hasVotedToEnd = false;
     }
 
-    resetTurnTimer(data.settings.draw_time);
+    resetTurnTimer(data.settings.draw_time, data.settings.autodraw_enabled !== false);
 }
 
-function resetTurnTimer(duration) {
+function resetTurnTimer(duration, enabled = true) {
     clearInterval(drawTimerInterval);
     let secondsLeft = duration;
     const timerDisplay = document.getElementById('draw-timer');
+    const timerWrap = document.getElementById('draw-timer-wrap');
     
     if (!timerDisplay) return;
+    if (timerWrap) timerWrap.style.display = enabled ? 'block' : 'none';
+    if (!enabled) {
+        timerDisplay.innerText = '-';
+        return;
+    }
     timerDisplay.innerText = secondsLeft;
 
     drawTimerInterval = setInterval(() => {
@@ -401,7 +488,7 @@ function renderPlayers(players, playerOrder) {
 
         section.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h3 style="margin: 0; color: ${isMe ? '#3498db' : 'white'}">${player.username}${player.connected === false ? ' · GHOST' : ''}</h3>
+                <h3 style="margin: 0; color: ${isMe ? '#3498db' : 'white'}">${escapeHtml(player.username)}${player.connected === false ? ' · GHOST' : ''}</h3>
                 <div class="score-badge" style="font-size: 1.8rem;">${player.score || 0}</div>
             </div>
             <div class="words-container" style="display: flex; flex-wrap: wrap; gap: 10px;">
@@ -473,6 +560,9 @@ function showEndGameCountdown(players) {
 }
 
 function showGameOverScreen(data) {
+    setTopReplayVisible(false);
+    const existingModal = document.getElementById('game-over-modal');
+    if (existingModal) existingModal.remove();
     const modal = document.createElement('div');
     modal.id = 'game-over-modal';
     modal.style.cssText = `
@@ -516,13 +606,14 @@ function showGameOverScreen(data) {
     
     const scoresHtml = scores.map((s, idx) => `
         <div style="font-size: 1.2rem; margin: 10px; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 8px;">
-            ${idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '  '} ${s.username}: <span style="color: #2ecc71; font-weight: bold;">${s.score} points</span>
+            ${idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '  '} ${escapeHtml(s.username)}: <span style="color: #2ecc71; font-weight: bold;">${Number(s.score) || 0} points</span>
         </div>
     `).join('');
     
     modal.innerHTML = `
-        <div style="background: #1a252f; padding: 50px; border-radius: 20px; text-align: center; border: 3px solid #2ecc71; max-width: 600px;">
-            <h1 style="font-size: 3rem; margin-bottom: 30px; letter-spacing: 2px;">${resultText}</h1>
+        <div style="position: relative; background: #1a252f; padding: 50px; border-radius: 20px; text-align: center; border: 3px solid #2ecc71; max-width: 600px;">
+            <button type="button" onclick="closeGameOverScreen()" aria-label="Close final scores" style="position: absolute; top: 10px; right: 14px; border: 0; background: transparent; color: white; cursor: pointer; font-size: 2rem;">&times;</button>
+            <h1 style="font-size: 3rem; margin-bottom: 30px; letter-spacing: 2px;">${escapeHtml(resultText)}</h1>
             <div style="margin-bottom: 40px;">
                 ${scoresHtml}
             </div>
@@ -538,15 +629,31 @@ function showGameOverScreen(data) {
     document.body.appendChild(modal);
 }
 
+function setTopReplayVisible(visible) {
+    const replayButton = document.getElementById('topReplayButton');
+    const tileCountDisplay = document.getElementById('tileCountDisplay');
+    if (replayButton) replayButton.hidden = !visible;
+    if (tileCountDisplay) tileCountDisplay.hidden = visible;
+}
+
+function closeGameOverScreen() {
+    const modal = document.getElementById('game-over-modal');
+    if (modal) modal.remove();
+    setTopReplayVisible(true);
+}
+
 async function showBoardWordDefinition(word) {
+    const request = ++wordDetailsRequest;
     const modal = document.getElementById('board-definition-modal');
     const title = document.getElementById('board-definition-title');
     const body = document.getElementById('board-definition-body');
+    const stealsBody = document.getElementById('board-steals-body');
     title.textContent = word;
     body.textContent = 'Loading definition...';
+    stealsBody.textContent = 'Finding direct steals...';
     modal.hidden = false;
 
-    try {
+    const definitionPromise = (async () => {
         let data = boardDefinitionCache.get(word);
         if (!data) {
             const response = await fetch(`/definition/${encodeURIComponent(word.toLowerCase())}`);
@@ -557,7 +664,7 @@ async function showBoardWordDefinition(word) {
             }
             boardDefinitionCache.set(word, data);
         }
-
+        if (request !== wordDetailsRequest) return;
         const list = document.createElement('ol');
         for (const item of data.definitions || []) {
             const row = document.createElement('li');
@@ -569,16 +676,103 @@ async function showBoardWordDefinition(word) {
         body.replaceChildren();
         if (data.isWord && list.children.length) body.appendChild(list);
         else body.textContent = 'No definition found.';
-    } catch (error) {
-        body.textContent = 'Definition unavailable right now.';
+    })().catch(() => {
+        if (request === wordDetailsRequest) body.textContent = 'Definition unavailable right now.';
+    });
+
+    const stealsPromise = (async () => {
+        const maxAdded = Math.min(3, 15 - word.length);
+        if (maxAdded < 1) {
+            if (request === wordDetailsRequest) stealsBody.textContent = 'No larger game words are possible.';
+            return;
+        }
+
+        let groups = boardStealCache.get(word);
+        if (!groups) {
+            const response = await fetch('/word-extensions', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    letters: word,
+                    minAdded: 1,
+                    maxAdded,
+                    chainMode: false
+                })
+            });
+            if (!response.ok) throw new Error('Steals unavailable');
+            const data = await response.json();
+            groups = data.groups || [];
+            if (boardStealCache.size >= 100) {
+                boardStealCache.delete(boardStealCache.keys().next().value);
+            }
+            boardStealCache.set(word, groups);
+        }
+        if (request !== wordDetailsRequest) return;
+        renderDirectSteals(word, groups, stealsBody);
+    })().catch(() => {
+        if (request === wordDetailsRequest) stealsBody.textContent = 'Ways to steal are unavailable right now.';
+    });
+
+    await Promise.allSettled([definitionPromise, stealsPromise]);
+}
+
+function renderDirectSteals(sourceWord, groups, container) {
+    container.replaceChildren();
+    const groupsBySize = new Map(groups.map(group => [Number(group.added), group]));
+
+    for (let added = 1; added <= 3; added++) {
+        const section = document.createElement('section');
+        section.className = 'steal-group';
+        const heading = document.createElement('h4');
+        heading.textContent = `+${added}`;
+        section.appendChild(heading);
+
+        const group = groupsBySize.get(added);
+        if (!group || !group.words.length) {
+            const empty = document.createElement('p');
+            empty.className = 'steal-empty';
+            empty.textContent = added > 15 - sourceWord.length ? 'Not possible at this word length.' : 'No direct steals found.';
+            section.appendChild(empty);
+        } else {
+            const words = document.createElement('div');
+            words.className = 'steal-words';
+            group.words.forEach(word => words.appendChild(buildStealWord(sourceWord, word)));
+            section.appendChild(words);
+            if (group.total > group.words.length) {
+                const overflow = document.createElement('p');
+                overflow.className = 'steal-overflow';
+                overflow.textContent = `Showing ${group.words.length} of ${group.total}.`;
+                section.appendChild(overflow);
+            }
+        }
+        container.appendChild(section);
     }
 }
 
+function buildStealWord(sourceWord, word) {
+    const available = {};
+    for (const char of sourceWord) available[char] = (available[char] || 0) + 1;
+    const block = document.createElement('div');
+    block.className = 'steal-word';
+    block.title = word;
+    for (const char of word) {
+        const tile = document.createElement('span');
+        tile.className = 'tile small';
+        if (available[char] > 0) available[char]--;
+        else tile.classList.add('added');
+        tile.textContent = char;
+        block.appendChild(tile);
+    }
+    return block;
+}
+
 function closeBoardWordDefinition() {
+    wordDetailsRequest++;
     document.getElementById('board-definition-modal').hidden = true;
 }
 
 function requestReplay() {
+    setTopReplayVisible(false);
     socket.emit('replay_game', { room: ROOM_ID });
 }
 
@@ -602,7 +796,7 @@ function showUsernamePopup() {
     modal.innerHTML = `
         <div style="background: #1a252f; padding: 50px; border-radius: 20px; text-align: center; border: 3px solid #3498db; max-width: 400px;">
             <h1 style="font-size: 2rem; margin-bottom: 30px; letter-spacing: 2px;">ENTER USERNAME</h1>
-            <input type="text" id="username-input" placeholder="Your name..." 
+            <input type="text" id="username-input" maxlength="24" placeholder="Your name..."
                    style="width: 100%; padding: 15px; border-radius: 8px; border: 2px solid #3498db; background: #2c3e50; color: white; font-size: 1.1rem; outline: none; margin-bottom: 25px; text-align: center;" autocomplete="off">
             <div style="display: flex; gap: 15px; justify-content: center;">
                 <button class="btn btn-green" onclick="confirmUsername()" style="padding: 12px 40px; font-size: 1rem;">JOIN</button>
@@ -623,8 +817,15 @@ function showUsernamePopup() {
 function confirmUsername() {
     const input = document.getElementById('username-input');
     const username = input.value.trim() || "Player_" + Math.floor(Math.random() * 1000);
+    if (username.length > 24 || !safeUsernamePattern.test(username)) {
+        input.setCustomValidity("Use 1–24 letters, numbers, spaces, apostrophes, periods, hyphens, or underscores.");
+        input.reportValidity();
+        return;
+    }
+    input.setCustomValidity('');
     myUsername = username;
     sessionStorage.setItem('anagramsMultiplayerUsername', myUsername);
+    localStorage.setItem('anagramsMultiplayerUsername', myUsername);
     
     // Remove modal
     const modals = document.querySelectorAll('div[style*="z-index: 10000"]');
@@ -762,4 +963,29 @@ function showActionMessage(message) {
         msgDiv.style.color = "#f39c12";
         setTimeout(() => msgDiv.innerText = "", 4000);
     }
+}
+
+function showReconnectNotice() {
+    if (document.getElementById('reconnect-notice')) return;
+    const notice = document.createElement('div');
+    notice.id = 'reconnect-notice';
+    notice.style.cssText = 'position:fixed;inset:0;z-index:12000;display:grid;place-items:center;background:rgba(8,14,20,.9);';
+    notice.innerHTML = `
+        <div style="max-width:420px;padding:34px;text-align:center;border:2px solid #3498db;border-radius:18px;background:#1a252f;">
+            <h2>CONNECTION LOST</h2>
+            <p style="opacity:.75;line-height:1.5;">Your seat is being held. Rejoin with the same name, words, score, and turn position.</p>
+            <button id="rejoin-button" class="btn btn-blue" type="button">REJOIN NOW</button>
+            <p id="rejoin-status" style="min-height:1.2em;font-size:.82rem;opacity:.7;">Trying automatically…</p>
+        </div>`;
+    document.body.appendChild(notice);
+    notice.querySelector('#rejoin-button').addEventListener('click', () => {
+        notice.querySelector('#rejoin-status').textContent = 'Reconnecting…';
+        joinedSocketId = '';
+        if (socket.connected) joinCurrentSocket();
+        else socket.connect();
+    });
+}
+
+function hideReconnectNotice() {
+    document.getElementById('reconnect-notice')?.remove();
 }

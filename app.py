@@ -1,10 +1,14 @@
 import os
 import json
+import secrets
+import sys
+import threading
 import uuid
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections import defaultdict, deque
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, make_response
 from flask_session import Session
 from flask_socketio import SocketIO
@@ -15,15 +19,84 @@ from game import (check_dictionary, choose_bot_move, generate_tiles, same_root, 
 from constants import TILE_COUNT, AUTODRAW_INTERVAL_MS, MIN_WORD_LENGTH
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'anagrams_secret')
+app.secret_key = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
 app.config['SESSION_TYPE'] = 'filesystem'
+app.config['MAX_CONTENT_LENGTH'] = 64 * 1024
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('COOKIE_SECURE', '').lower() == 'true'
 Session(app)
 ranked_puzzles = {}
 RANKED_MAX_STRIKES = 3
 definition_cache = {}
 
-# FIXED: Use async_mode='threading' to avoid Python 3.13 eventlet crashes
-socketio = SocketIO(app, manage_session=True, cors_allowed_origins="*", async_mode='threading')
+MAX_WORD_LENGTH = 30
+MAX_BOARD_WORDS = 100
+MAX_GAME_TILES = 200
+_rate_limit_buckets = defaultdict(deque)
+_rate_limit_lock = threading.Lock()
+
+
+def _configured_origins():
+    """Use same-origin Socket.IO by default; allow explicit deployment origins."""
+    raw_origins = os.environ.get('ALLOWED_ORIGINS', '')
+    origins = [origin.strip() for origin in raw_origins.split(',') if origin.strip()]
+    return origins or None
+
+
+def _json_object():
+    data = request.get_json(silent=True)
+    return data if isinstance(data, dict) else None
+
+
+def _limited(key, maximum, window_seconds):
+    """Small in-process limiter for endpoints that do dictionary or network work."""
+    now = time.monotonic()
+    client = request.remote_addr or 'unknown'
+    bucket_key = (client, key)
+    with _rate_limit_lock:
+        bucket = _rate_limit_buckets[bucket_key]
+        cutoff = now - window_seconds
+        while bucket and bucket[0] <= cutoff:
+            bucket.popleft()
+        if len(bucket) >= maximum:
+            return True
+        bucket.append(now)
+    return False
+
+
+def _valid_string_list(value, maximum_items, maximum_length, alphabet=None):
+    if not isinstance(value, list) or len(value) > maximum_items:
+        return False
+    for item in value:
+        if not isinstance(item, str) or len(item) > maximum_length:
+            return False
+        if alphabet == 'en' and (not item or not item.isascii() or not item.isalpha()):
+            return False
+    return True
+
+# Socket.IO enforces same-origin unless ALLOWED_ORIGINS explicitly names trusted sites.
+socketio = SocketIO(
+    app,
+    manage_session=True,
+    cors_allowed_origins=_configured_origins(),
+    max_http_buffer_size=64 * 1024,
+    async_mode='threading',
+)
+
+
+@app.after_request
+def add_security_headers(response):
+    response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    response.headers.setdefault('X-Frame-Options', 'DENY')
+    response.headers.setdefault('Referrer-Policy', 'same-origin')
+    response.headers.setdefault('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+    return response
+
+
+@app.errorhandler(413)
+def request_too_large(_error):
+    return jsonify({'error': 'Request is too large.'}), 413
 
 @app.route('/')
 def home():
@@ -53,7 +126,11 @@ def ranked_puzzles_page():
 
 @app.route('/ranked-puzzle', methods=['POST'])
 def ranked_puzzle():
-    data = request.get_json() or {}
+    if _limited('ranked-puzzle', 20, 60):
+        return jsonify({'error': 'Too many requests. Please slow down.'}), 429
+    data = _json_object()
+    if data is None:
+        return jsonify({'error': 'Expected a JSON object.'}), 400
     try:
         elo = max(0, min(4000, int(data.get('elo', 1000))))
         puzzle = generate_ranked_puzzle(elo)
@@ -72,18 +149,23 @@ def ranked_puzzle():
 
 @app.route('/ranked-submit', methods=['POST'])
 def ranked_submit():
-    data = request.get_json() or {}
+    data = _json_object()
+    if data is None:
+        return jsonify({'error': 'Expected a JSON object.'}), 400
     puzzle = ranked_puzzles.get(data.get('id'))
     if not puzzle:
         return jsonify({'correct': False, 'failed': True,
                         'message': 'This puzzle is already over. Load the next puzzle.',
                         'error': 'This puzzle is already over. Load the next puzzle.'}), 404
-    word = str(data.get('word', '')).upper().strip()
+    submitted_word = data.get('word', '')
+    if not isinstance(submitted_word, str) or len(submitted_word) > MAX_WORD_LENGTH:
+        return jsonify({'correct': False, 'message': 'Enter a valid word.'}), 400
+    word = submitted_word.upper().strip()
     try:
         elo = max(0, min(4000, int(data.get('elo', 1000))))
     except (TypeError, ValueError):
         elo = 1000
-    if not word.isalpha() or len(word) < 3:
+    if not word.isascii() or not word.isalpha() or len(word) < 3:
         return jsonify({'correct': False, 'message': 'Enter a valid word.'})
     puzzle['attempts'] += 1
     source = puzzle['solutions'].get(word)
@@ -115,7 +197,9 @@ def ranked_submit():
 
 @app.route('/ranked-give-up', methods=['POST'])
 def ranked_give_up():
-    data = request.get_json() or {}
+    data = _json_object()
+    if data is None:
+        return jsonify({'error': 'Expected a JSON object.'}), 400
     puzzle = ranked_puzzles.pop(data.get('id'), None)
     if not puzzle:
         return jsonify({'message': 'This puzzle is already over. Load the next puzzle.',
@@ -134,19 +218,29 @@ def ranked_give_up():
 @app.route('/create-room')
 def create_room():
     room_id = str(uuid.uuid4())[:4].upper()
-    return redirect(url_for('multiplayer_game', room_id=room_id))
+    bot = request.args.get('bot', '')
+    if bot not in {'easy', 'medium', 'hard'}:
+        bot = ''
+    return redirect(url_for('multiplayer_game', room_id=room_id, bot=bot))
 
 @app.route('/join-room', methods=['POST'])
 def join_room_post():
     room_id = request.form.get('room_id', '').upper().strip()
-    if room_id:
+    if len(room_id) == 4 and room_id.isascii() and room_id.isalnum():
         return redirect(url_for('multiplayer_game', room_id=room_id))
     return redirect(url_for('index'))
 
 @app.route('/multiplayer/<room_id>')
 def multiplayer_game(room_id):
+    room_id = room_id.upper().strip()
+    if len(room_id) != 4 or not room_id.isascii() or not room_id.isalnum():
+        return redirect(url_for('index'))
+    bot = request.args.get('bot', '')
+    if bot not in {'easy', 'medium', 'hard'}:
+        bot = ''
     return render_template('multiplayergamescreen.html', 
                            room_id=room_id,
+                           initial_bot_difficulty=bot,
                            tile_count=TILE_COUNT, 
                            autodraw_interval=AUTODRAW_INTERVAL_MS)
 
@@ -168,15 +262,11 @@ def zen_game():
 
 @app.route('/botgamescreen', methods=['POST'])
 def bot_game():
+    """Legacy entry point: bot games now live inside multiplayer lobbies."""
     difficulty = request.form.get('difficulty', 'medium')
-    autodraw_mode = request.form.get('autodraw', 'off')
-    session['tiles'] = generate_tiles()
-    session.modified = True
-    return render_template('botgamescreen.html', 
-                           difficulty=difficulty, 
-                           autodraw_mode=autodraw_mode,
-                           tile_count=TILE_COUNT, 
-                           autodraw_interval=AUTODRAW_INTERVAL_MS)
+    if difficulty not in {'easy', 'medium', 'hard'}:
+        difficulty = 'medium'
+    return redirect(url_for('create_room', bot=difficulty))
 
 # --- API HELPERS ---
 
@@ -199,26 +289,58 @@ def get_tile():
 
 @app.route('/bot-move', methods=['POST'])
 def bot_move():
-    data = request.get_json() or {}
+    if _limited('bot-move', 60, 60):
+        return jsonify({'error': 'Too many requests. Please slow down.'}), 429
+    data = _json_object()
+    if data is None:
+        return jsonify({'error': 'Expected a JSON object.'}), 400
     active_tiles = data.get('activeTiles', [])
     board_words = data.get('boardWords', [])
     difficulty = data.get('difficulty', 'medium')
+    if difficulty not in {'easy', 'medium', 'hard'}:
+        return jsonify({'error': 'Invalid game options.'}), 400
+    if (not _valid_string_list(active_tiles, MAX_GAME_TILES, 1, 'en')
+            or not _valid_string_list(board_words, MAX_BOARD_WORDS, MAX_WORD_LENGTH, 'en')):
+        return jsonify({'error': 'Invalid game state.'}), 400
     move = choose_bot_move(active_tiles, board_words, difficulty)
     return jsonify(move)
 
 @app.route('/check-word', methods=['POST'])
 def check_word():
-    word = request.json.get('word', '').lower().strip()
-    return jsonify({'valid': check_dictionary(word)})
+    if _limited('check-word', 120, 60):
+        return jsonify({'error': 'Too many requests. Please slow down.'}), 429
+    data = _json_object()
+    if data is None:
+        return jsonify({'error': 'Expected a JSON object.'}), 400
+    word = data.get('word', '')
+    if not isinstance(word, str) or len(word) > MAX_WORD_LENGTH:
+        return jsonify({'error': 'Invalid word.'}), 400
+    normalized = word.lower().strip()
+    if not normalized.isascii() or not normalized.isalpha():
+        return jsonify({'valid': False})
+    return jsonify({'valid': check_dictionary(normalized)})
 
 @app.route('/word-extensions', methods=['POST'])
 def word_extensions():
-    data = request.get_json() or {}
+    if _limited('word-extensions', 30, 60):
+        return jsonify({'error': 'Too many requests. Please slow down.'}), 429
+    data = _json_object()
+    if data is None:
+        return jsonify({'error': 'Expected a JSON object.'}), 400
+    if not isinstance(data.get('letters', ''), str):
+        return jsonify({'error': 'Invalid letters.'}), 400
     letters = data.get('letters', '').lower().strip()
     reverse = bool(data.get('reverseMode'))
     biggest_only = bool(data.get('biggestOnly'))
-    forced_words = [word.strip() for word in data.get('forcedWords', []) if word.strip()]
+    submitted_forced_words = data.get('forcedWords', [])
+    if (not isinstance(submitted_forced_words, list)
+            or len(submitted_forced_words) > 15
+            or any(not isinstance(word, str) or len(word) > 15 for word in submitted_forced_words)):
+        return jsonify({'error': 'Invalid forced-word constraints.'}), 400
+    forced_words = [word.strip() for word in submitted_forced_words if word.strip()]
     raw_forced_letters = data.get('forcedLetters', {})
+    if not isinstance(raw_forced_letters, dict) or len(raw_forced_letters) > 15:
+        return jsonify({'error': 'Invalid forced-letter constraints.'}), 400
     try:
         forced_letters = {
             int(step): str(value).strip()
@@ -227,11 +349,12 @@ def word_extensions():
         }
     except (AttributeError, TypeError, ValueError):
         return jsonify({'error': 'Invalid forced-letter constraints.'}), 400
-    if any(not value.isalpha() for value in forced_letters.values()):
+    if any(len(value) > 14 or not value.isascii() or not value.isalpha()
+           for value in forced_letters.values()):
         return jsonify({'error': 'Forced letters must contain A–Z only.'}), 400
-    if any(not word.isalpha() for word in forced_words):
+    if any(not word.isascii() or not word.isalpha() for word in forced_words):
         return jsonify({'error': 'Forced words must contain A–Z only.'}), 400
-    if not letters.isalpha() or len(letters) > 15:
+    if not letters.isascii() or not letters.isalpha() or len(letters) > 15:
         return jsonify({'error': 'Enter 1–15 letters (A–Z only).'}), 400
 
     try:
@@ -272,8 +395,10 @@ def word_extensions():
 @app.route('/definition/<word>')
 def word_definition(word):
     """Return a small definition payload and cache lookups for one day."""
+    if _limited('definition', 40, 60):
+        return jsonify({'error': 'Too many requests. Please slow down.'}), 429
     normalized = word.lower().strip()
-    if not normalized.isalpha() or len(normalized) > 30:
+    if not normalized.isascii() or not normalized.isalpha() or len(normalized) > 30:
         return jsonify({'error': 'Invalid word.'}), 400
 
     cached = definition_cache.get(normalized)
@@ -313,17 +438,41 @@ def word_definition(word):
 
 @app.route('/check-stem', methods=['POST'])
 def check_stem():
-    w1 = request.json.get('word1', '').lower()
-    w2 = request.json.get('word2', '').lower()
-    return jsonify({'same_root': same_root(w1, w2)})
+    if _limited('check-stem', 120, 60):
+        return jsonify({'error': 'Too many requests. Please slow down.'}), 429
+    data = _json_object()
+    if data is None:
+        return jsonify({'error': 'Expected a JSON object.'}), 400
+    w1 = data.get('word1', '')
+    w2 = data.get('word2', '')
+    if (not isinstance(w1, str) or not isinstance(w2, str)
+            or len(w1) > MAX_WORD_LENGTH or len(w2) > MAX_WORD_LENGTH):
+        return jsonify({'error': 'Invalid words.'}), 400
+    if (not w1.isascii() or not w1.isalpha()
+            or not w2.isascii() or not w2.isalpha()):
+        return jsonify({'error': 'Invalid words.'}), 400
+    return jsonify({'same_root': same_root(w1.lower(), w2.lower())})
 
 @app.route('/get-hint', methods=['POST'])
 def get_hint():
-    data = request.get_json() or {}
+    if _limited('get-hint', 30, 60):
+        return jsonify({'error': 'Too many requests. Please slow down.'}), 429
+    data = _json_object()
+    if data is None:
+        return jsonify({'error': 'Expected a JSON object.'}), 400
     active_tiles = data.get('activeTiles', [])
     board_words = data.get('boardWords', [])
+    if (not _valid_string_list(active_tiles, MAX_GAME_TILES, 1, 'en')
+            or not _valid_string_list(board_words, MAX_BOARD_WORDS, MAX_WORD_LENGTH, 'en')):
+        return jsonify({'error': 'Invalid game state.'}), 400
     hints = get_hints(active_tiles, board_words)
     return jsonify(hints)
+
+# When launched with ``python app.py``, make ``from app import socketio`` in
+# multiplayer.py resolve to this same module instead of importing a second app
+# instance with a different Socket.IO server.
+if __name__ == '__main__':
+    sys.modules.setdefault('app', sys.modules[__name__])
 
 # Import multiplayer logic at the end
 import multiplayer

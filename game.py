@@ -222,7 +222,15 @@ def find_word_extensions(letters, min_added=1, max_added=5, limit_per_length=150
                         len(forced_here) == 1 and word in forced_here
                     )
                     if contains_step and legal_step and forced_letters_match and forced_word_match:
-                        word_paths.extend(path + [word] for path in chain_paths[predecessor])
+                        # A dense reverse search can have exponentially many equivalent
+                        # chains. Keep a representative set so "find smallest" remains
+                        # fast and the JSON response stays bounded on production workers.
+                        remaining = 40 - len(word_paths)
+                        if remaining > 0:
+                            word_paths.extend(
+                                path + [word]
+                                for path in chain_paths[predecessor][:remaining]
+                            )
                 if word_paths:
                     chain_words.append(word)
                     chain_paths[word] = word_paths

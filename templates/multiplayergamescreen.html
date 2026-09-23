@@ -4,11 +4,13 @@
 <!-- Pass variables from Flask to JS -->
 <script>
     const ROOM_ID = "{{ room_id }}";
+    const INITIAL_BOT_DIFFICULTY = "{{ initial_bot_difficulty }}";
 </script>
 
 <!-- 1. THE LOBBY (Shown by default) -->
 <div id="lobby-container" style="max-width: 600px; margin: 40px auto; padding: 30px; background: var(--board-color); border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center;">
-    <h1 style="margin-bottom: 10px; letter-spacing: 2px;">WAITING ROOM</h1>
+    <h1 style="margin-bottom: 10px; letter-spacing: 2px;">GAME LOBBY</h1>
+    <p id="lobby-mode-label" style="margin: -2px 0 18px; color: #b7c7d6;">MULTIPLAYER / BOT</p>
     <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 10px; font-family: monospace; font-size: 1.5rem; color: #3498db; margin-bottom: 25px;">
         CODE: <span style="color: white; font-weight: bold;">{{ room_id }}</span>
     </div>
@@ -32,8 +34,16 @@
                        style="width: 80%; padding: 8px; border-radius: 5px; border: none; text-align: center; font-weight: bold;">
             </div>
             <div style="flex: 1;">
+                <label for="setting-autodraw" style="display: block; font-size: 0.8rem; margin-bottom: 5px;">AUTO-DRAW</label>
+                <select id="setting-autodraw" onchange="updateSettings()"
+                        style="width: 90%; padding: 8px; border-radius: 5px; border: none; text-align: center; font-weight: bold;">
+                    <option value="true">ON</option>
+                    <option value="false">OFF</option>
+                </select>
+            </div>
+            <div style="flex: 1;">
                 <label style="display: block; font-size: 0.8rem; margin-bottom: 5px;">DRAW TIMER (S)</label>
-                <input type="number" id="setting-timer" value="20" min="3" max="20" onchange="updateSettings()"
+                <input type="number" id="setting-timer" value="20" min="3" max="60" onchange="updateSettings()"
                        style="width: 80%; padding: 8px; border-radius: 5px; border: none; text-align: center; font-weight: bold;">
             </div>
             <div style="flex: 1;">
@@ -57,7 +67,10 @@
 
     <!-- PLAYER LIST -->
     <div style="text-align: left; margin-bottom: 30px;">
-        <h3 style="font-size: 1rem; opacity: 0.7; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px;">PLAYERS</h3>
+        <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 8px;">
+            <h3 style="font-size: 1rem; opacity: 0.7;">PLAYERS &amp; BOTS</h3>
+            <button id="add-bot-btn" type="button" class="btn btn-toggle" onclick="addBot()" style="display: none; padding: 8px 12px; font-size: .75rem;">+ ADD BOT</button>
+        </div>
         <div id="player-list">
             <!-- Players injected via JS -->
             <p style="text-align: center; opacity: 0.5;">Connecting...</p>
@@ -79,11 +92,14 @@
         
         <div style="text-align: center;">
             <div id="turn-indicator" style="font-weight: bold; font-size: 1.1rem; letter-spacing: 1px;">WAITING...</div>
-            <div style="font-size: 0.8rem; opacity: 0.8;">AUTO-DRAW IN: <span id="draw-timer" style="color: #e74c3c; font-weight: bold; font-size: 1.1rem;">-</span>s</div>
+            <div id="draw-timer-wrap" style="font-size: 0.8rem; opacity: 0.8;">AUTO-DRAW IN: <span id="draw-timer" style="color: #e74c3c; font-weight: bold; font-size: 1.1rem;">-</span>s</div>
         </div>
 
-        <div style="font-weight: bold;">
-            Tiles: <span id="tileCount">--</span>
+        <div class="game-top-actions">
+            <button id="topReplayButton" class="btn btn-green" type="button" onclick="requestReplay()" hidden>PLAY AGAIN</button>
+            <div id="tileCountDisplay" style="font-weight: bold;">
+                Tiles: <span id="tileCount">--</span>
+            </div>
         </div>
     </div>
 
@@ -102,7 +118,7 @@
     <!-- Input Footer -->
     <div style="position: fixed; bottom: 0; width: 100%; background: #1a252f; padding: 20px; display: flex; justify-content: center; gap: 15px; z-index: 1000; border-top: 2px solid rgba(255,255,255,0.1);">
         <div style="position: relative;">
-            <input type="text" id="wordInput" placeholder="Type word..." 
+            <input type="text" id="wordInput" maxlength="30" placeholder="Type word..."
                    style="padding: 15px; border-radius: 30px; width: 400px; border: 3px solid transparent; font-size: 1.2rem; outline: none; background: #2c3e50; color: white;"
                    autocomplete="off">
             <div id="statusMessage" style="position: absolute; top: -25px; left: 20px; font-weight: bold; font-size: 0.9rem;"></div>
@@ -113,10 +129,19 @@
 
 <div id="board-definition-modal" class="definition-modal" hidden>
     <div class="definition-card" role="dialog" aria-modal="true" aria-labelledby="board-definition-title">
-        <button type="button" class="definition-close" onclick="closeBoardWordDefinition()" aria-label="Close definition">&times;</button>
+        <button type="button" class="definition-close" onclick="closeBoardWordDefinition()" aria-label="Close word details">&times;</button>
         <h2 id="board-definition-title"></h2>
-        <div id="board-definition-body" aria-live="polite"></div>
-        <p class="definition-credit">Definitions powered by Datamuse.</p>
+        <div class="word-details-grid">
+            <section class="word-details-panel">
+                <h3>DEFINITION</h3>
+                <div id="board-definition-body" aria-live="polite"></div>
+                <p class="definition-credit">Definitions powered by Datamuse.</p>
+            </section>
+            <section class="word-details-panel word-steals-panel">
+                <h3>WAYS TO STEAL IT</h3>
+                <div id="board-steals-body" aria-live="polite"></div>
+            </section>
+        </div>
     </div>
 </div>
 
@@ -133,7 +158,28 @@
     .lobby-player-item:hover {
         transform: translateX(5px);
     }
-    
+
+    .lobby-row-controls { display: flex; align-items: center; gap: 7px; }
+    .lobby-row-controls select {
+        padding: 6px 8px;
+        border: 0;
+        border-radius: 6px;
+        font-size: .72rem;
+        font-weight: 800;
+    }
+    .lobby-remove {
+        width: 30px;
+        height: 30px;
+        padding: 0;
+        border: 1px solid rgba(231,76,60,.65);
+        border-radius: 7px;
+        background: rgba(231,76,60,.13);
+        color: #ffb5ae;
+        cursor: pointer;
+        font-weight: 900;
+    }
+    .lobby-remove[data-kick-player] { width: auto; padding: 0 8px; font-size: .64rem; }
+
     /* Input styling for Host Settings */
     #host-controls input {
         background: #2c3e50;
@@ -157,6 +203,16 @@
     #drawButton {
         transition: all 0.3s ease;
     }
+
+    .game-top-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 14px;
+        min-width: 130px;
+    }
+
+    #topReplayButton[hidden] { display: none; }
 
     /* Keep word tiles looking consistent */
     .word-block {
@@ -195,8 +251,8 @@
     .definition-modal[hidden] { display: none; }
     .definition-card {
         position: relative;
-        width: min(560px, 90vw);
-        max-height: 75vh;
+        width: min(1000px, 92vw);
+        max-height: 82vh;
         overflow-y: auto;
         padding: 28px;
         border: 2px solid rgba(243,229,171,.5);
@@ -204,8 +260,42 @@
         background: #1a252f;
         box-shadow: 0 15px 45px rgba(0,0,0,.5);
     }
-    .definition-card h2 { color: var(--tile-bg); letter-spacing: 2px; }
+    .definition-card h2 { margin-top: 0; color: var(--tile-bg); letter-spacing: 2px; }
     .definition-card li { margin-bottom: 10px; line-height: 1.5; }
+    .word-details-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 24px;
+    }
+    .word-details-panel {
+        min-width: 0;
+        padding: 18px;
+        border-radius: 12px;
+        background: rgba(0,0,0,.2);
+    }
+    .word-details-panel h3 {
+        margin: 0 0 18px;
+        color: #f3e5ab;
+        letter-spacing: 1px;
+    }
+    .steal-group + .steal-group { margin-top: 20px; }
+    .steal-group h4 { margin: 0 0 10px; color: #2ecc71; }
+    .steal-words { display: flex; flex-wrap: wrap; gap: 8px; }
+    .steal-word {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        padding: 5px;
+        border-radius: 8px;
+        background: rgba(255,255,255,.06);
+    }
+    .steal-word .added {
+        background: #2ecc71;
+        color: #102b1b;
+        box-shadow: 0 2px 0 #1d9b50;
+    }
+    .steal-empty { margin: 0; opacity: .65; }
+    .steal-overflow { margin: 8px 0 0; font-size: .78rem; opacity: .65; }
     .definition-close {
         position: absolute;
         top: 10px;
@@ -217,6 +307,12 @@
         font-size: 2rem;
     }
     .definition-credit { margin-bottom: 0; color: #bbb; font-size: .8rem; }
+
+    @media (max-width: 700px) {
+        .word-details-grid { grid-template-columns: 1fr; }
+        .game-top-actions { min-width: 0; }
+        #topReplayButton { padding: 9px 12px; font-size: .75rem; }
+    }
 </style>
 
 {% endblock %}

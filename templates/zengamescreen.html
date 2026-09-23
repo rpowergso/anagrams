@@ -19,7 +19,7 @@
 </div>
 
 <div style="position: fixed; bottom: 0; width: 100%; background: #1a252f; padding: 20px; display: flex; justify-content: center; gap: 15px; align-items: center; z-index: 1000;">
-    <input type="text" id="wordInput" placeholder="Type word..." style="padding: 15px; border-radius: 30px; width: 350px; border: none; font-size: 1.2rem;">
+    <input type="text" id="wordInput" maxlength="30" placeholder="Type word..." style="padding: 15px; border-radius: 30px; width: 350px; border: none; font-size: 1.2rem;">
     <button class="btn btn-green" onclick="checkWord()">SUBMIT</button>
     <div id="result" style="font-weight: bold;"></div>
     <button class="btn btn-toggle" onclick="getSmallHint()" style="background: #f39c12; font-size: 0.9rem; padding: 10px 15px;">SMALL HINT</button>
@@ -36,7 +36,9 @@
 
     window.onload = () => { renderTiles(); };
     const input = document.getElementById('wordInput');
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') checkWord(); });
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') input.value.trim() ? checkWord() : drawTile();
+    });
 </script>
 <script src="/static/js/gamefunctions.js"></script>
 <script src="/static/js/sologame.js"></script>
