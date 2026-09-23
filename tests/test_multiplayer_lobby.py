@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from app import app, socketio
 from multiplayer import reconnect_tokens, room_bans, rooms, sid_tokens
@@ -48,6 +49,32 @@ class MultiplayerLobbyTests(unittest.TestCase):
         self.assertEqual(rooms['TEST']['status'], 'playing')
         self.assertTrue(rooms['TEST']['zen_mode'])
         self.assertTrue(rooms['TEST']['tiles'])
+
+    def test_solo_zen_end_game_skips_countdown(self):
+        self.host.emit('start_game', {'room': 'TEST'})
+        self.host.get_received()
+
+        self.host.emit('vote_end_game', {'room': 'TEST'})
+
+        messages = self.host.get_received()
+        vote = next(message for message in messages if message['name'] == 'end_game_vote')
+        self.assertTrue(vote['args'][0]['immediate'])
+        self.assertTrue(any(message['name'] == 'game_ended' for message in messages))
+        self.assertEqual(rooms['TEST']['status'], 'ended')
+
+    def test_bot_game_keeps_ten_second_end_countdown(self):
+        self.host.emit('add_bot', {'room': 'TEST', 'difficulty': 'easy'})
+        self.host.emit('start_game', {'room': 'TEST'})
+        self.host.get_received()
+
+        with patch.object(socketio, 'start_background_task') as start_task:
+            self.host.emit('vote_end_game', {'room': 'TEST'})
+
+        messages = self.host.get_received()
+        vote = next(message for message in messages if message['name'] == 'end_game_vote')
+        self.assertFalse(vote['args'][0]['immediate'])
+        start_task.assert_called_once()
+        self.assertEqual(rooms['TEST']['status'], 'playing')
 
     def test_host_can_kick_another_player(self):
         guest_http = app.test_client()

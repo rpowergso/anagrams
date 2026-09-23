@@ -8,7 +8,7 @@
 </script>
 
 <!-- 1. THE LOBBY (Shown by default) -->
-<div id="lobby-container" style="max-width: 600px; margin: 40px auto; padding: 30px; background: var(--board-color); border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center;">
+<div id="lobby-container" class="lobby-shell" style="max-width: 600px; margin: 40px auto; padding: 30px; background: var(--board-color); border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center;">
     <h1 style="margin-bottom: 10px; letter-spacing: 2px;">GAME LOBBY</h1>
     <p id="lobby-mode-label" style="margin: -2px 0 18px; color: #b7c7d6;">MULTIPLAYER / BOT</p>
     <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 10px; font-family: monospace; font-size: 1.5rem; color: #3498db; margin-bottom: 25px;">
@@ -16,10 +16,10 @@
     </div>
 
     <!-- HOST ONLY SETTINGS -->
-    <div id="host-controls" style="display: none; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; margin-bottom: 25px; border: 1px dashed rgba(255,255,255,0.2);">
+    <div id="host-controls" class="lobby-settings-card" style="display: none; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; margin-bottom: 25px; border: 1px dashed rgba(255,255,255,0.2);">
         <h3 style="margin-top: 0; font-size: 0.9rem; color: #f1c40f;">HOST SETTINGS 👑</h3>
-        <div style="display: flex; justify-content: space-around; gap: 15px; flex-wrap: wrap;">
-            <div style="flex: 1;">
+        <div class="lobby-settings-grid" style="display: flex; justify-content: space-around; gap: 15px; flex-wrap: wrap;">
+            <div class="lobby-setting" style="flex: 1;">
                 <label for="setting-preset" style="display: block; font-size: 0.8rem; margin-bottom: 5px;">TILE SET</label>
                 <select id="setting-preset" onchange="applyTilePreset()"
                         style="width: 90%; padding: 8px; border-radius: 5px; border: none; text-align: center; font-weight: bold;">
@@ -28,12 +28,12 @@
                     <option value="custom">CUSTOM</option>
                 </select>
             </div>
-            <div style="flex: 1;">
+            <div class="lobby-setting" style="flex: 1;">
                 <label for="setting-tiles" style="display: block; font-size: 0.8rem; margin-bottom: 5px;">TOTAL TILES</label>
                 <input type="number" id="setting-tiles" value="60" min="20" max="144" onchange="useCustomTileCount()"
                        style="width: 80%; padding: 8px; border-radius: 5px; border: none; text-align: center; font-weight: bold;">
             </div>
-            <div style="flex: 1;">
+            <div class="lobby-setting" style="flex: 1;">
                 <label for="setting-autodraw" style="display: block; font-size: 0.8rem; margin-bottom: 5px;">AUTO-DRAW</label>
                 <select id="setting-autodraw" onchange="updateSettings()"
                         style="width: 90%; padding: 8px; border-radius: 5px; border: none; text-align: center; font-weight: bold;">
@@ -41,12 +41,12 @@
                     <option value="false">OFF</option>
                 </select>
             </div>
-            <div style="flex: 1;">
+            <div class="lobby-setting" style="flex: 1;">
                 <label style="display: block; font-size: 0.8rem; margin-bottom: 5px;">DRAW TIMER (S)</label>
                 <input type="number" id="setting-timer" value="20" min="3" max="60" onchange="updateSettings()"
                        style="width: 80%; padding: 8px; border-radius: 5px; border: none; text-align: center; font-weight: bold;">
             </div>
-            <div style="flex: 1;">
+            <div class="lobby-setting" style="flex: 1;">
                 <label for="setting-penalty" style="display: block; font-size: 0.8rem; margin-bottom: 5px;">MISTAKE SILENCE</label>
                 <select id="setting-penalty" onchange="updateSettings()"
                         style="width: 80%; padding: 8px; border-radius: 5px; border: none; text-align: center; font-weight: bold;">
@@ -54,7 +54,7 @@
                     <option value="false">NO</option>
                 </select>
             </div>
-            <div style="flex: 1;">
+            <div class="lobby-setting" style="flex: 1;">
                 <label for="setting-winner-draws" style="display: block; font-size: 0.8rem; margin-bottom: 5px;">WORD WINNER DRAWS NEXT</label>
                 <select id="setting-winner-draws" onchange="updateSettings()"
                         style="width: 80%; padding: 8px; border-radius: 5px; border: none; text-align: center; font-weight: bold;">
@@ -66,7 +66,7 @@
     </div>
 
     <!-- PLAYER LIST -->
-    <div style="text-align: left; margin-bottom: 30px;">
+    <div class="lobby-roster" style="text-align: left; margin-bottom: 30px;">
         <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 8px;">
             <h3 style="font-size: 1rem; opacity: 0.7;">PLAYERS &amp; BOTS</h3>
             <button id="add-bot-btn" type="button" class="btn btn-toggle" onclick="addBot()" style="display: none; padding: 8px 12px; font-size: .75rem;">+ ADD BOT</button>
@@ -77,7 +77,7 @@
         </div>
     </div>
 
-    <div style="display: flex; gap: 15px; justify-content: center;">
+    <div class="lobby-actions" style="display: flex; gap: 15px; justify-content: center;">
         <button class="btn btn-leave" onclick="confirmLeaveGame()" style="padding: 12px 25px;">LEAVE</button>
         <button id="ready-btn" class="btn btn-blue" onclick="toggleReady()" style="padding: 12px 40px;">READY UP</button>
         <button id="start-btn" class="btn btn-green" onclick="startGame()" style="display: none; padding: 12px 40px;">START GAME</button>
@@ -137,7 +137,7 @@
                 <div id="board-definition-body" aria-live="polite"></div>
                 <p class="definition-credit">Definitions powered by Datamuse.</p>
             </section>
-            <section class="word-details-panel word-steals-panel">
+            <section id="board-steals-panel" class="word-details-panel word-steals-panel">
                 <h3>WAYS TO STEAL IT</h3>
                 <div id="board-steals-body" aria-live="polite"></div>
             </section>
@@ -150,6 +150,44 @@
 <script src="{{ url_for('static', filename='js/multiplayer.js') }}"></script>
 
 <style>
+    #lobby-container.lobby-shell {
+        width: min(820px, calc(100% - 32px));
+        max-width: 820px !important;
+        box-sizing: border-box;
+    }
+
+    .lobby-settings-grid {
+        display: grid !important;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px !important;
+    }
+
+    .lobby-setting {
+        min-width: 0;
+        padding: 12px;
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 10px;
+        background: rgba(0,0,0,.14);
+        text-align: left;
+    }
+
+    .lobby-setting label {
+        display: flex !important;
+        align-items: flex-end;
+        min-height: 2.1em;
+        line-height: 1.05;
+    }
+
+    #host-controls .lobby-setting input,
+    #host-controls .lobby-setting select {
+        width: 100% !important;
+        min-width: 0;
+        height: 38px;
+        box-sizing: border-box;
+    }
+
+    .lobby-actions { flex-wrap: wrap; }
+
     /* Styling for the Lobby Player List */
     .lobby-player-item {
         transition: transform 0.2s;
@@ -260,6 +298,9 @@
         background: #1a252f;
         box-shadow: 0 15px 45px rgba(0,0,0,.5);
     }
+    .definition-card.definition-only { width: min(560px, 92vw); }
+    .definition-card.definition-only .word-details-grid { grid-template-columns: 1fr; }
+    .word-steals-panel[hidden] { display: none; }
     .definition-card h2 { margin-top: 0; color: var(--tile-bg); letter-spacing: 2px; }
     .definition-card li { margin-bottom: 10px; line-height: 1.5; }
     .word-details-grid {
@@ -309,9 +350,20 @@
     .definition-credit { margin-bottom: 0; color: #bbb; font-size: .8rem; }
 
     @media (max-width: 700px) {
+        #lobby-container.lobby-shell {
+            width: min(100% - 20px, 820px);
+            margin: 20px auto !important;
+            padding: 20px !important;
+        }
+        .lobby-settings-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .word-details-grid { grid-template-columns: 1fr; }
         .game-top-actions { min-width: 0; }
         #topReplayButton { padding: 9px 12px; font-size: .75rem; }
+    }
+
+    @media (max-width: 460px) {
+        .lobby-settings-grid { grid-template-columns: 1fr; }
+        .lobby-actions .btn { flex: 1 1 130px; }
     }
 </style>
 

@@ -26,6 +26,8 @@ let lastSubmittedWord = null;
 const boardDefinitionCache = new Map();
 const boardStealCache = new Map();
 let wordDetailsRequest = 0;
+let wordLookupAllowed = false;
+let gameHasEnded = false;
 
 function escapeHtml(value) {
     const node = document.createElement('span');
@@ -99,7 +101,7 @@ socket.on('end_game_vote', (data) => {
     const votesReceived = Object.values(endGameVotes).filter(v => v).length;
     updateEndGameUI(votesReceived, votesNeeded);
     
-    if (votesReceived >= votesNeeded) {
+    if (votesReceived >= votesNeeded && !data.immediate) {
         // Start countdown to game end
         showSmallCountdown();
         lockTextInput();
@@ -107,6 +109,8 @@ socket.on('end_game_vote', (data) => {
 });
 
 socket.on('game_ended', (data) => {
+    gameHasEnded = true;
+    wordLookupAllowed = countHumanPlayers(data.players) <= 1;
     showGameOverScreen(data);
 });
 
@@ -125,10 +129,13 @@ socket.on('lobby_update', (data) => {
         playerReadyState = false;
         playerLockedOut = false;
         countdownActive = false;
+        gameHasEnded = false;
+        wordLookupAllowed = false;
         silencedUntil = 0;
         hasVotedToEnd = false;
         lastSubmittedWord = null;
         clearInterval(silenceTimerInterval);
+        closeBoardWordDefinition();
         unlockTextInput();
         const readyBtn = document.getElementById('ready-btn');
         if (readyBtn) {
@@ -144,6 +151,7 @@ socket.on('lobby_update', (data) => {
 socket.on('game_start', (data) => {
     hideReconnectNotice();
     setTopReplayVisible(false);
+    gameHasEnded = false;
     const lobbyContainer = document.getElementById('lobby-container');
     const gameContainer = document.getElementById('game-container');
     
@@ -371,7 +379,9 @@ function renderLobby(data) {
 function updateUI(data) {
     const countEl = document.getElementById('tileCount');
     if (countEl) countEl.innerText = data.tiles.length;
-    
+
+    wordLookupAllowed = countHumanPlayers(data.players) <= 1;
+    gameHasEnded = data.status === 'ended' || gameHasEnded;
     renderPool(data.active_pool);
     renderPlayers(data.players, data.player_order);
 
@@ -479,12 +489,14 @@ function renderPlayers(players, playerOrder) {
         section.style.border = isMe ? '2px solid #3498db' : '1px solid rgba(255,255,255,0.1)';
         section.style.opacity = player.connected === false ? '0.55' : '1';
 
-        const wordsHtml = player.words.map(w => `
-            <button type="button" class="word-block board-word-button" onclick="showBoardWordDefinition('${w}')" title="Show definition of ${w}">
+        const wordsHtml = player.words.map(w => {
+            const contents = `
                 ${w.split('').map(char => `<div class="tile small">${char}</div>`).join('')}
-                <span class="word-score-tag">${w.length - 2}</span>
-            </button>
-        `).join('');
+                <span class="word-score-tag">${w.length - 2}</span>`;
+            if (!wordLookupAllowed) return `<div class="word-block">${contents}</div>`;
+            const detail = gameHasEnded ? 'definition and direct steals' : 'definition';
+            return `<button type="button" class="word-block board-word-button" data-board-word="${escapeHtml(w)}" title="Show ${detail} for ${escapeHtml(w)}">${contents}</button>`;
+        }).join('');
 
         section.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
@@ -495,8 +507,15 @@ function renderPlayers(players, playerOrder) {
                 ${wordsHtml}
             </div>
         `;
+        section.querySelectorAll('[data-board-word]').forEach(button => {
+            button.addEventListener('click', () => showBoardWordDefinition(button.dataset.boardWord));
+        });
         board.appendChild(section);
     }
+}
+
+function countHumanPlayers(players = {}) {
+    return Object.values(players).filter(player => !player.is_bot).length;
 }
 
 function requestEndGame() {
@@ -643,14 +662,20 @@ function closeGameOverScreen() {
 }
 
 async function showBoardWordDefinition(word) {
+    if (!wordLookupAllowed) return;
     const request = ++wordDetailsRequest;
     const modal = document.getElementById('board-definition-modal');
+    const card = modal.querySelector('.definition-card');
     const title = document.getElementById('board-definition-title');
     const body = document.getElementById('board-definition-body');
+    const stealsPanel = document.getElementById('board-steals-panel');
     const stealsBody = document.getElementById('board-steals-body');
+    const showSteals = gameHasEnded;
     title.textContent = word;
     body.textContent = 'Loading definition...';
-    stealsBody.textContent = 'Finding direct steals...';
+    card.classList.toggle('definition-only', !showSteals);
+    stealsPanel.hidden = !showSteals;
+    if (showSteals) stealsBody.textContent = 'Finding direct steals...';
     modal.hidden = false;
 
     const definitionPromise = (async () => {
@@ -679,6 +704,11 @@ async function showBoardWordDefinition(word) {
     })().catch(() => {
         if (request === wordDetailsRequest) body.textContent = 'Definition unavailable right now.';
     });
+
+    if (!showSteals) {
+        await definitionPromise;
+        return;
+    }
 
     const stealsPromise = (async () => {
         const maxAdded = Math.min(3, 15 - word.length);

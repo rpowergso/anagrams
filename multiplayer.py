@@ -657,7 +657,7 @@ def on_draw(data):
 def on_vote_end_game(data):
     room, game = event_room(data)
     
-    if not game:
+    if not game or game.get('status') != 'playing':
         return
     
     # Initialize end game votes if not present
@@ -675,23 +675,34 @@ def on_vote_end_game(data):
     total_players = len(human_sids)
     votes_for_end = len(set(game['end_game_votes']) & human_sids)
     votes_needed = (total_players * 2) // 3 + (1 if (total_players * 2) % 3 > 0 else 0)
+    immediate_end = bool(game.get('zen_mode') and total_players == 1)
     
     # Send vote update to all players
     emit('end_game_vote', {
         'votes': game['end_game_votes'],
         'players': game['players'],
-        'votes_needed': votes_needed
+        'votes_needed': votes_needed,
+        'immediate': immediate_end,
     }, room=room)
     
     # If 2/3 majority reached, start final countdown
     if votes_for_end >= votes_needed and not game.get('end_countdown_started'):
         game['end_countdown_started'] = True
-        # Start 10 second countdown, then end game
-        socketio.start_background_task(end_game_countdown, room, game)
+        if immediate_end:
+            finish_game(room, game)
+        else:
+            # Give multiplayer and bot games a final 10-second window.
+            socketio.start_background_task(end_game_countdown, room, game)
 
 def end_game_countdown(room, game):
-    time.sleep(10)
-    
+    socketio.sleep(10)
+    finish_game(room, game)
+
+
+def finish_game(room, game):
+    if rooms.get(room) is not game or game.get('status') != 'playing':
+        return
+
     # Calculate final scores and announce winner
     final_scores = {}
     for sid, player in game['players'].items():
