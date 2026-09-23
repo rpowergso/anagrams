@@ -15,11 +15,11 @@
                 <button class="btn btn-toggle" style="width: 100%; height: 50px; font-size: 1rem; margin-bottom: 15px; background: #9b59b6;">CREATE ROOM</button>
             </a>
             
-            <!-- Join Room Form -->
+            <!-- Join or create a custom room code -->
             <form action="/join-room" method="POST" style="display: flex; flex-direction: column; gap: 12px;">
-                <input type="text" name="room_id" maxlength="4" pattern="[A-Za-z0-9]{4}" placeholder="ROOM CODE"
+                <input type="text" name="room_id" maxlength="16" pattern="[A-Za-z0-9]{1,16}" placeholder="CUSTOM ROOM CODE" required
                        style="width: 100%; padding: 12px 15px; border-radius: 8px; border: 2px solid rgba(155, 89, 182, 0.3); background: rgba(0,0,0,0.2); color: white; font-weight: bold; text-transform: uppercase; outline: none; text-align: center; font-size: 0.95rem; box-sizing: border-box;">
-                <button type="submit" class="btn btn-green" style="width: 100%; padding: 12px; border-radius: 8px;">JOIN ROOM</button>
+                <button type="submit" class="btn btn-green" style="width: 100%; padding: 12px; border-radius: 8px;">JOIN / CREATE ROOM</button>
             </form>
             
             <p style="margin-top: 20px; opacity: 0.7; font-size: 0.9rem; line-height: 1.6;">Invite friends or add bots and choose their difficulty inside the lobby.</p>

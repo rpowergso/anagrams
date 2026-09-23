@@ -26,8 +26,11 @@ let lastSubmittedWord = null;
 const boardDefinitionCache = new Map();
 const boardStealCache = new Map();
 let wordDetailsRequest = 0;
-let wordLookupAllowed = false;
 let gameHasEnded = false;
+let gameInProgress = false;
+let prefireEnabled = false;
+let pasteAllowed = true;
+let standbyWord = '';
 
 function escapeHtml(value) {
     const node = document.createElement('span');
@@ -54,13 +57,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     submitWord();
                 }
+            } else if (e.key === 'Tab' && prefireEnabled) {
+                e.preventDefault();
+                handleStandbyWord();
             } else if (e.key === ' ') {
                 // Space key submits the word instead of typing a space
                 e.preventDefault();
                 submitWord();
             }
         });
+        ['paste', 'copy', 'cut', 'drop'].forEach(eventName => {
+            wordInput.addEventListener(eventName, event => {
+                if (pasteAllowed) return;
+                event.preventDefault();
+                showInputMessage('Copy and paste are disabled for this game.', '#f1c40f');
+            });
+        });
     }
+
+    document.addEventListener('pointerup', () => {
+        window.setTimeout(focusWordInput, 0);
+    });
 
     // Capture my Socket ID when connected
     socket.on('connect', () => {
@@ -110,7 +127,7 @@ socket.on('end_game_vote', (data) => {
 
 socket.on('game_ended', (data) => {
     gameHasEnded = true;
-    wordLookupAllowed = countHumanPlayers(data.players) <= 1;
+    gameInProgress = false;
     showGameOverScreen(data);
 });
 
@@ -130,7 +147,8 @@ socket.on('lobby_update', (data) => {
         playerLockedOut = false;
         countdownActive = false;
         gameHasEnded = false;
-        wordLookupAllowed = false;
+        gameInProgress = false;
+        clearStandbyWord();
         silencedUntil = 0;
         hasVotedToEnd = false;
         lastSubmittedWord = null;
@@ -152,6 +170,7 @@ socket.on('game_start', (data) => {
     hideReconnectNotice();
     setTopReplayVisible(false);
     gameHasEnded = false;
+    gameInProgress = true;
     const lobbyContainer = document.getElementById('lobby-container');
     const gameContainer = document.getElementById('game-container');
     
@@ -212,6 +231,8 @@ function updateSettings() {
     const tilePreset = document.getElementById('setting-preset').value;
     const incorrectWordPenalty = document.getElementById('setting-penalty').value;
     const wordWinnerDrawsNext = document.getElementById('setting-winner-draws').value;
+    const prefire = document.getElementById('setting-prefire').value;
+    const paste = document.getElementById('setting-paste').value;
     socket.emit('update_settings', {
         room: ROOM_ID,
         tile_preset: tilePreset,
@@ -219,7 +240,9 @@ function updateSettings() {
         draw_time: drawTime,
         autodraw_enabled: autodrawEnabled,
         incorrect_word_penalty: incorrectWordPenalty,
-        word_winner_draws_next: wordWinnerDrawsNext
+        word_winner_draws_next: wordWinnerDrawsNext,
+        prefire_enabled: prefire,
+        paste_allowed: paste
     });
 }
 
@@ -267,14 +290,14 @@ function drawTile() {
     if (input) input.focus();
 }
 
-function submitWord() {
+function submitWord(wordOverride = null) {
     // If locked out during countdown, don't allow submission
     if (playerLockedOut) {
         return;
     }
     
     const input = document.getElementById('wordInput');
-    const word = input.value.trim().toUpperCase();
+    const word = (wordOverride ?? input.value).trim().toUpperCase();
     if (word.length < 3) return;
     if (lastSubmittedWord === word) return;
     lastSubmittedWord = word;
@@ -283,7 +306,50 @@ function submitWord() {
         room: ROOM_ID, 
         word: word 
     });
-    input.value = "";
+    if (wordOverride === null) input.value = "";
+    focusWordInput();
+}
+
+function handleStandbyWord() {
+    if (!standbyWord) {
+        const input = document.getElementById('wordInput');
+        const candidate = input.value.trim().toUpperCase();
+        if (candidate.length < 3) {
+            showInputMessage('Type a word first, then press Tab to hold it.', '#f1c40f');
+            return;
+        }
+        standbyWord = candidate;
+        input.value = '';
+        updateStandbyWordDisplay();
+        showInputMessage(`${standbyWord} is standing by. Press Tab again to play it.`, '#f1c40f');
+        return;
+    }
+
+    const wordToPlay = standbyWord;
+    clearStandbyWord();
+    submitWord(wordToPlay);
+}
+
+function clearStandbyWord() {
+    standbyWord = '';
+    updateStandbyWordDisplay();
+}
+
+function updateStandbyWordDisplay() {
+    const display = document.getElementById('standbyWordDisplay');
+    if (!display) return;
+    display.hidden = !standbyWord;
+    display.textContent = standbyWord ? `STANDBY: ${standbyWord} · TAB TO PLAY` : '';
+}
+
+function showInputMessage(message, color) {
+    const status = document.getElementById('statusMessage');
+    if (!status) return;
+    status.textContent = message;
+    status.style.color = color;
+    window.setTimeout(() => {
+        if (status.textContent === message) status.textContent = '';
+    }, 2500);
 }
 
 /* --- UI RENDERING --- */
@@ -316,19 +382,28 @@ function renderLobby(data) {
     const autodrawInput = document.getElementById('setting-autodraw');
     const penaltyInput = document.getElementById('setting-penalty');
     const winnerDrawsInput = document.getElementById('setting-winner-draws');
-    if (presetInput && tileInput && timerInput && autodrawInput && penaltyInput && winnerDrawsInput && data.settings) {
+    const prefireInput = document.getElementById('setting-prefire');
+    const pasteInput = document.getElementById('setting-paste');
+    if (presetInput && tileInput && timerInput && autodrawInput && penaltyInput && winnerDrawsInput && prefireInput && pasteInput && data.settings) {
         presetInput.value = data.settings.tile_preset || 'custom';
         tileInput.value = data.settings.max_tiles;
         timerInput.value = data.settings.draw_time;
         autodrawInput.value = data.settings.autodraw_enabled === false ? 'false' : 'true';
         penaltyInput.value = data.settings.incorrect_word_penalty === false ? 'false' : 'true';
         winnerDrawsInput.value = data.settings.word_winner_draws_next === true ? 'true' : 'false';
+        prefireInput.value = data.settings.prefire_enabled === true ? 'true' : 'false';
+        pasteInput.value = data.settings.paste_allowed === false ? 'false' : 'true';
+        prefireEnabled = data.settings.prefire_enabled === true;
+        pasteAllowed = data.settings.paste_allowed !== false;
+        if (!prefireEnabled) clearStandbyWord();
         presetInput.disabled = !amIHost;
         tileInput.disabled = !amIHost || presetInput.value !== 'custom';
         timerInput.disabled = !amIHost;
         autodrawInput.disabled = !amIHost;
         penaltyInput.disabled = !amIHost;
         winnerDrawsInput.disabled = !amIHost;
+        prefireInput.disabled = !amIHost;
+        pasteInput.disabled = !amIHost;
     }
 
     // List players
@@ -380,8 +455,11 @@ function updateUI(data) {
     const countEl = document.getElementById('tileCount');
     if (countEl) countEl.innerText = data.tiles.length;
 
-    wordLookupAllowed = countHumanPlayers(data.players) <= 1;
     gameHasEnded = data.status === 'ended' || gameHasEnded;
+    gameInProgress = data.status === 'playing' && !gameHasEnded;
+    prefireEnabled = data.settings.prefire_enabled === true;
+    pasteAllowed = data.settings.paste_allowed !== false;
+    if (!prefireEnabled) clearStandbyWord();
     renderPool(data.active_pool);
     renderPlayers(data.players, data.player_order);
 
@@ -430,6 +508,7 @@ function updateUI(data) {
     }
 
     resetTurnTimer(data.settings.draw_time, data.settings.autodraw_enabled !== false);
+    window.setTimeout(focusWordInput, 0);
 }
 
 function resetTurnTimer(duration, enabled = true) {
@@ -493,7 +572,6 @@ function renderPlayers(players, playerOrder) {
             const contents = `
                 ${w.split('').map(char => `<div class="tile small">${char}</div>`).join('')}
                 <span class="word-score-tag">${w.length - 2}</span>`;
-            if (!wordLookupAllowed) return `<div class="word-block">${contents}</div>`;
             const detail = gameHasEnded ? 'definition and direct steals' : 'definition';
             return `<button type="button" class="word-block board-word-button" data-board-word="${escapeHtml(w)}" title="Show ${detail} for ${escapeHtml(w)}">${contents}</button>`;
         }).join('');
@@ -512,10 +590,6 @@ function renderPlayers(players, playerOrder) {
         });
         board.appendChild(section);
     }
-}
-
-function countHumanPlayers(players = {}) {
-    return Object.values(players).filter(player => !player.is_bot).length;
 }
 
 function requestEndGame() {
@@ -662,7 +736,6 @@ function closeGameOverScreen() {
 }
 
 async function showBoardWordDefinition(word) {
-    if (!wordLookupAllowed) return;
     const request = ++wordDetailsRequest;
     const modal = document.getElementById('board-definition-modal');
     const card = modal.querySelector('.definition-card');
@@ -799,6 +872,7 @@ function buildStealWord(sourceWord, word) {
 function closeBoardWordDefinition() {
     wordDetailsRequest++;
     document.getElementById('board-definition-modal').hidden = true;
+    focusWordInput();
 }
 
 function requestReplay() {
@@ -810,6 +884,7 @@ function requestReplay() {
 
 function showUsernamePopup() {
     const modal = document.createElement('div');
+    modal.className = 'blocking-modal';
     modal.style.cssText = `
         position: fixed;
         top: 0;
@@ -868,6 +943,7 @@ function confirmUsername() {
 
 function confirmLeaveGame() {
     const modal = document.createElement('div');
+    modal.className = 'blocking-modal';
     modal.style.cssText = `
         position: fixed;
         top: 0;
@@ -955,7 +1031,17 @@ function unlockTextInput() {
         input.style.opacity = '1';
         input.style.cursor = 'text';
         input.placeholder = 'Type word...';
+        window.setTimeout(focusWordInput, 0);
     }
+}
+
+function focusWordInput() {
+    const input = document.getElementById('wordInput');
+    const wordModal = document.getElementById('board-definition-modal');
+    if (!input || input.disabled || !gameInProgress) return;
+    if (wordModal && !wordModal.hidden) return;
+    if (document.querySelector('.blocking-modal, #game-over-modal, #end-game-countdown')) return;
+    input.focus({ preventScroll: true });
 }
 
 function startSilenceTimer(seconds, message) {

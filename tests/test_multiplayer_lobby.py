@@ -104,11 +104,15 @@ class MultiplayerLobbyTests(unittest.TestCase):
             'draw_time': 45, 'autodraw_enabled': False,
             'incorrect_word_penalty': True,
             'word_winner_draws_next': True,
+            'prefire_enabled': True,
+            'paste_allowed': False,
         })
         settings = rooms['TEST']['settings']
         self.assertFalse(settings['autodraw_enabled'])
         self.assertEqual(settings['draw_time'], 45)
         self.assertTrue(settings['word_winner_draws_next'])
+        self.assertTrue(settings['prefire_enabled'])
+        self.assertFalse(settings['paste_allowed'])
 
 
 if __name__ == '__main__':

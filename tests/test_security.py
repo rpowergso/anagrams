@@ -25,6 +25,21 @@ class HttpSecurityTests(unittest.TestCase):
         self.assertIn('id="topReplayButton"', page)
         self.assertIn('id="board-steals-body"', page)
         self.assertIn('WAYS TO STEAL IT', page)
+        self.assertIn('id="setting-prefire"', page)
+        self.assertIn('id="setting-paste"', page)
+        self.assertIn('id="standbyWordDisplay"', page)
+
+    def test_custom_room_code_routes_to_a_new_lobby(self):
+        response = self.client.post('/join-room', data={'room_id': 'friends2026'})
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.headers['Location'].endswith('/multiplayer/FRIENDS2026'))
+        lobby = self.client.get(response.headers['Location'])
+        self.assertEqual(lobby.status_code, 200)
+
+    def test_custom_room_code_rejects_unsafe_characters(self):
+        response = self.client.post('/join-room', data={'room_id': '../oops'})
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(response.headers['Location'].endswith('/multiplayer/../OOPS'))
 
     def test_large_request_is_rejected(self):
         response = self.client.post(

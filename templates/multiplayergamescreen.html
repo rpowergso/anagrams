@@ -62,6 +62,22 @@
                     <option value="true">YES</option>
                 </select>
             </div>
+            <div class="lobby-setting" style="flex: 1;">
+                <label for="setting-prefire" style="display: block; font-size: 0.8rem; margin-bottom: 5px;">TAB PREFIRE</label>
+                <select id="setting-prefire" onchange="updateSettings()"
+                        style="width: 80%; padding: 8px; border-radius: 5px; border: none; text-align: center; font-weight: bold;">
+                    <option value="false">OFF</option>
+                    <option value="true">ON</option>
+                </select>
+            </div>
+            <div class="lobby-setting" style="flex: 1;">
+                <label for="setting-paste" style="display: block; font-size: 0.8rem; margin-bottom: 5px;">COPY / PASTE</label>
+                <select id="setting-paste" onchange="updateSettings()"
+                        style="width: 80%; padding: 8px; border-radius: 5px; border: none; text-align: center; font-weight: bold;">
+                    <option value="true">ALLOWED</option>
+                    <option value="false">BLOCKED</option>
+                </select>
+            </div>
         </div>
     </div>
 
@@ -118,6 +134,7 @@
     <!-- Input Footer -->
     <div style="position: fixed; bottom: 0; width: 100%; background: #1a252f; padding: 20px; display: flex; justify-content: center; gap: 15px; z-index: 1000; border-top: 2px solid rgba(255,255,255,0.1);">
         <div style="position: relative;">
+            <div id="standbyWordDisplay" class="standby-word" hidden></div>
             <input type="text" id="wordInput" maxlength="30" placeholder="Type word..."
                    style="padding: 15px; border-radius: 30px; width: 400px; border: 3px solid transparent; font-size: 1.2rem; outline: none; background: #2c3e50; color: white;"
                    autocomplete="off">
@@ -158,7 +175,7 @@
 
     .lobby-settings-grid {
         display: grid !important;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 12px !important;
     }
 
@@ -187,6 +204,25 @@
     }
 
     .lobby-actions { flex-wrap: wrap; }
+
+    .standby-word {
+        position: absolute;
+        left: 18px;
+        bottom: calc(100% + 28px);
+        max-width: min(360px, 75vw);
+        padding: 7px 11px;
+        overflow: hidden;
+        border: 1px solid rgba(241,196,15,.7);
+        border-radius: 8px;
+        background: rgba(44,62,80,.97);
+        color: #f1c40f;
+        font-size: .78rem;
+        font-weight: 800;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .standby-word[hidden] { display: none; }
 
     /* Styling for the Lobby Player List */
     .lobby-player-item {

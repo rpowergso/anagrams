@@ -226,14 +226,14 @@ def create_room():
 @app.route('/join-room', methods=['POST'])
 def join_room_post():
     room_id = request.form.get('room_id', '').upper().strip()
-    if len(room_id) == 4 and room_id.isascii() and room_id.isalnum():
+    if 1 <= len(room_id) <= 16 and room_id.isascii() and room_id.isalnum():
         return redirect(url_for('multiplayer_game', room_id=room_id))
     return redirect(url_for('index'))
 
 @app.route('/multiplayer/<room_id>')
 def multiplayer_game(room_id):
     room_id = room_id.upper().strip()
-    if len(room_id) != 4 or not room_id.isascii() or not room_id.isalnum():
+    if not (1 <= len(room_id) <= 16 and room_id.isascii() and room_id.isalnum()):
         return redirect(url_for('index'))
     bot = request.args.get('bot', '')
     if bot not in {'easy', 'medium', 'hard'}:

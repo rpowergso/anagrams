@@ -25,7 +25,7 @@ event_buckets_lock = threading.Lock()
 
 
 def valid_room_id(room):
-    return (isinstance(room, str) and len(room) == 4
+    return (isinstance(room, str) and 1 <= len(room) <= 16
             and room.isascii() and room.isalnum())
 
 
@@ -285,7 +285,9 @@ def on_join(data):
                 'draw_time': 20,
                 'autodraw_enabled': True,
                 'incorrect_word_penalty': True,
-                'word_winner_draws_next': False
+                'word_winner_draws_next': False,
+                'prefire_enabled': False,
+                'paste_allowed': True,
             },
             'tiles': [],
             'active_pool': [],
@@ -508,6 +510,20 @@ def on_update_settings(data):
         )
         game['settings']['word_winner_draws_next'] = (
             winner_draw_value is True or str(winner_draw_value).lower() == 'true'
+        )
+        prefire_value = data.get(
+            'prefire_enabled',
+            game['settings'].get('prefire_enabled', False)
+        )
+        game['settings']['prefire_enabled'] = (
+            prefire_value is True or str(prefire_value).lower() == 'true'
+        )
+        paste_value = data.get(
+            'paste_allowed',
+            game['settings'].get('paste_allowed', True)
+        )
+        game['settings']['paste_allowed'] = (
+            paste_value is True or str(paste_value).lower() == 'true'
         )
         emit('lobby_update', game, room=room)
 
