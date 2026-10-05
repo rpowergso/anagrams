@@ -405,7 +405,13 @@ def word_definition(word):
     if cached and time.time() - cached['stored_at'] < 86400:
         return jsonify(cached['payload'])
 
-    query = urllib.parse.urlencode({'sp': normalized, 'qe': 'sp', 'md': 'd', 'max': 1})
+    query = urllib.parse.urlencode({
+        'sp': normalized,
+        'qe': 'sp',
+        'md': 'dr',
+        'ipa': 1,
+        'max': 1,
+    })
     upstream_request = urllib.request.Request(
         f'https://api.datamuse.com/words?{query}',
         headers={'User-Agent': 'AnagramsWordFinder/1.0'},
@@ -417,6 +423,8 @@ def word_definition(word):
         return jsonify({'error': 'Definition unavailable.'}), 503
 
     definitions = []
+    pronunciation = ''
+    pronunciation_type = ''
     if results and results[0].get('word', '').lower() == normalized:
         part_names = {'n': 'noun', 'v': 'verb', 'adj': 'adjective', 'adv': 'adverb', 'u': ''}
         for raw_definition in results[0].get('defs', [])[:6]:
@@ -425,10 +433,28 @@ def word_definition(word):
                 'partOfSpeech': part_names.get(part, part) if separator else '',
                 'definition': definition.strip() if separator else raw_definition.strip(),
             })
+        tags = results[0].get('tags', [])
+        pronunciation = next((
+            tag.removeprefix('ipa_pron:').strip()
+            for tag in tags
+            if isinstance(tag, str) and tag.startswith('ipa_pron:')
+        ), '')
+        if pronunciation:
+            pronunciation_type = 'IPA'
+        else:
+            pronunciation = next((
+                tag.removeprefix('pron:').strip()
+                for tag in tags
+                if isinstance(tag, str) and tag.startswith('pron:')
+            ), '')
+            if pronunciation:
+                pronunciation_type = 'ARPABET'
 
     payload = {
         'word': normalized.upper(),
         'isWord': bool(definitions),
+        'pronunciation': pronunciation,
+        'pronunciationType': pronunciation_type,
         'definitions': definitions,
     }
     if len(definition_cache) >= 500:

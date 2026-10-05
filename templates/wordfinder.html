@@ -3,7 +3,7 @@
 <main class="finder-shell">
     <a href="/homepage" class="finder-back">← BACK TO HOME</a>
     <h1>WORD FINDER</h1>
-    <p class="finder-help">Enter a word or loose letters. Every result uses all of them; highlighted tiles are the added letters. Click a result to search from it and see its definition.</p>
+    <p class="finder-help">Enter a word or loose letters. Every result uses all of them; highlighted tiles are the added letters. Click a result to search from it and see its pronunciation and definition.</p>
     <form id="finderForm" class="finder-form">
         <input id="finderInput" maxlength="15" autocomplete="off" placeholder="e.g. VAIN" value="{{ initial_word }}" required>
         <button class="btn btn-green" type="submit">FIND WORDS</button>
@@ -12,7 +12,7 @@
     <section id="definitionPanel" aria-live="polite" hidden>
         <h2 id="definitionTitle"></h2>
         <div id="definitionBody"></div>
-        <p class="definition-credit">Definitions powered by <a href="https://www.datamuse.com/api/" target="_blank" rel="noopener noreferrer">Datamuse</a>.</p>
+        <p class="definition-credit">Definitions and pronunciations powered by <a href="https://www.datamuse.com/api/" target="_blank" rel="noopener noreferrer">Datamuse</a>.</p>
     </section>
     <div class="chain-controls">
         <label><input id="reverseMode" type="checkbox"> REVERSE MODE</label>
@@ -51,6 +51,10 @@
     #definitionBody { line-height: 1.5; }
     #definitionBody ol { margin: 0; padding-left: 24px; }
     #definitionBody li { margin-bottom: 12px; }
+    .pronunciation-row { display: flex; align-items: center; gap: 10px; margin: 0 0 16px; color: #f3e5ab; }
+    .pronunciation-text { font-size: 1.08rem; }
+    .pronunciation-play { padding: 6px 10px; border: 1px solid rgba(243,229,171,.55); border-radius: 999px; background: rgba(243,229,171,.1); color: #fff; cursor: pointer; font: inherit; }
+    .pronunciation-play:hover, .pronunciation-play:focus-visible { background: rgba(243,229,171,.22); outline: 2px solid #f3e5ab; outline-offset: 2px; }
     .definition-credit { margin-bottom: 0; }
     .definition-credit, .definition-credit a { color: #ddd; font-size: .8rem; }
     .finder-word:focus-visible, .chain-word-tiles:focus-visible { outline: 3px solid white; outline-offset: 4px; }

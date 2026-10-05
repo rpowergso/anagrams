@@ -735,6 +735,36 @@ function closeGameOverScreen() {
     setTopReplayVisible(true);
 }
 
+function appendBoardWordPronunciation(container, word, pronunciation, pronunciationType) {
+    if (!pronunciation) return;
+
+    const row = document.createElement('div');
+    row.className = 'pronunciation-row';
+    const text = document.createElement('span');
+    text.className = 'pronunciation-text';
+    text.textContent = pronunciationType === 'ARPABET'
+        ? `Pronunciation: ${pronunciation}`
+        : `IPA: /${pronunciation}/`;
+    row.appendChild(text);
+
+    if ('speechSynthesis' in window && 'SpeechSynthesisUtterance' in window) {
+        const play = document.createElement('button');
+        play.type = 'button';
+        play.className = 'pronunciation-play';
+        play.textContent = '🔊 Hear word';
+        play.setAttribute('aria-label', `Hear ${word} pronounced`);
+        play.addEventListener('click', () => {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(word.toLowerCase());
+            utterance.lang = 'en-US';
+            window.speechSynthesis.speak(utterance);
+        });
+        row.appendChild(play);
+    }
+
+    container.appendChild(row);
+}
+
 async function showBoardWordDefinition(word) {
     const request = ++wordDetailsRequest;
     const modal = document.getElementById('board-definition-modal');
@@ -772,6 +802,7 @@ async function showBoardWordDefinition(word) {
             list.appendChild(row);
         }
         body.replaceChildren();
+        appendBoardWordPronunciation(body, word, data.pronunciation, data.pronunciationType);
         if (data.isWord && list.children.length) body.appendChild(list);
         else body.textContent = 'No definition found.';
     })().catch(() => {

@@ -323,6 +323,36 @@ function selectWord(word, paths) {
     window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
+function appendPronunciation(container, word, pronunciation, pronunciationType) {
+    if (!pronunciation) return;
+
+    const row = document.createElement('div');
+    row.className = 'pronunciation-row';
+    const text = document.createElement('span');
+    text.className = 'pronunciation-text';
+    text.textContent = pronunciationType === 'ARPABET'
+        ? `Pronunciation: ${pronunciation}`
+        : `IPA: /${pronunciation}/`;
+    row.appendChild(text);
+
+    if ('speechSynthesis' in window && 'SpeechSynthesisUtterance' in window) {
+        const play = document.createElement('button');
+        play.type = 'button';
+        play.className = 'pronunciation-play';
+        play.textContent = '🔊 Hear word';
+        play.setAttribute('aria-label', `Hear ${word} pronounced`);
+        play.addEventListener('click', () => {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(word.toLowerCase());
+            utterance.lang = 'en-US';
+            window.speechSynthesis.speak(utterance);
+        });
+        row.appendChild(play);
+    }
+
+    container.appendChild(row);
+}
+
 async function showDefinition(word) {
     const request = ++definitionRequest;
     definitionController?.abort();
@@ -351,6 +381,7 @@ async function showDefinition(word) {
             list.appendChild(row);
         }
         definitionBody.replaceChildren();
+        appendPronunciation(definitionBody, word, data.pronunciation, data.pronunciationType);
         if (data.isWord && list.children.length) definitionBody.appendChild(list);
         else definitionBody.textContent = `${word} is not a word.`;
     } catch (error) {

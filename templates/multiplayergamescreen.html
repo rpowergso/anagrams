@@ -150,9 +150,9 @@
         <h2 id="board-definition-title"></h2>
         <div class="word-details-grid">
             <section class="word-details-panel">
-                <h3>DEFINITION</h3>
+                <h3>DICTIONARY</h3>
                 <div id="board-definition-body" aria-live="polite"></div>
-                <p class="definition-credit">Definitions powered by Datamuse.</p>
+                <p class="definition-credit">Definitions and pronunciations powered by Datamuse.</p>
             </section>
             <section id="board-steals-panel" class="word-details-panel word-steals-panel">
                 <h3>WAYS TO STEAL IT</h3>
@@ -339,6 +339,10 @@
     .word-steals-panel[hidden] { display: none; }
     .definition-card h2 { margin-top: 0; color: var(--tile-bg); letter-spacing: 2px; }
     .definition-card li { margin-bottom: 10px; line-height: 1.5; }
+    .pronunciation-row { display: flex; align-items: center; gap: 10px; margin: 0 0 16px; color: #f3e5ab; }
+    .pronunciation-text { font-size: 1.08rem; }
+    .pronunciation-play { padding: 6px 10px; border: 1px solid rgba(243,229,171,.55); border-radius: 999px; background: rgba(243,229,171,.1); color: #fff; cursor: pointer; font: inherit; }
+    .pronunciation-play:hover, .pronunciation-play:focus-visible { background: rgba(243,229,171,.22); outline: 2px solid #f3e5ab; outline-offset: 2px; }
     .word-details-grid {
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
