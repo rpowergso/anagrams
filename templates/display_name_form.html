@@ -1,3 +1,13 @@
+{% if profile_name_form %}
+<form id="display-name-form" class="profile-name-form">
+    <label for="display-name">Display name</label>
+    <div class="profile-name-field">
+        <input id="display-name" name="displayName" type="text" placeholder="Choose your name" autocomplete="nickname" required>
+        <button type="submit">Save</button>
+    </div>
+    <p role="status"></p>
+</form>
+{% else %}
 <form id="display-name-form" style="margin-bottom: 16px;">
     <label for="display-name" style="display: block; margin-bottom: 8px;">Display name</label>
     <div style="display: flex; justify-content: center; flex-wrap: wrap; gap: 8px;">
@@ -7,3 +17,4 @@
     </div>
     <p role="status" style="margin: 6px 0 0; font-size: 0.85rem;"></p>
 </form>
+{% endif %}

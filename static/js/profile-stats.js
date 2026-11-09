@@ -142,6 +142,27 @@
     };
 
     document.addEventListener('DOMContentLoaded', () => {
+        const panel = document.getElementById('home-profile');
+        const open = document.getElementById('open-profile');
+        const close = document.getElementById('close-profile');
+        if (panel && open && close) {
+            const setPanel = visible => {
+                panel.hidden = !visible;
+                open.setAttribute('aria-expanded', String(visible));
+            };
+            setPanel(readPreference(sessionStorage, 'anagramsProfilePanelOpen',
+                !window.matchMedia('(max-width: 900px)').matches));
+            function togglePanel(visible) {
+                setPanel(visible);
+                storePreference(sessionStorage, 'anagramsProfilePanelOpen', visible);
+                (visible ? close : open).focus();
+            }
+            open.addEventListener('click', () => togglePanel(panel.hidden));
+            close.addEventListener('click', () => togglePanel(false));
+            panel.addEventListener('keydown', event => {
+                if (event.key === 'Escape') togglePanel(false);
+            });
+        }
         const name = document.getElementById('profile-display-name');
         const form = document.getElementById('display-name-form');
         if (name && form) {

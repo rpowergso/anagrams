@@ -1,7 +1,10 @@
-<aside class="profile-panel" aria-labelledby="profile-panel-title">
-    <h2 id="profile-panel-title">Your Profile</h2>
+<aside id="home-profile" class="profile-panel" aria-labelledby="profile-panel-title">
+    <div class="profile-heading">
+        <h2 id="profile-panel-title">Your Profile</h2>
+        <button type="button" id="close-profile" class="profile-close" aria-label="Close profile">×</button>
+    </div>
     <p id="profile-display-name" class="profile-name" data-default-name="{{ profile_user.name if profile_user else 'Guest' }}">{{ profile_user.name if profile_user else 'Guest' }}</p>
-    {% include 'display_name_form.html' %}
+    {% with profile_name_form=true %}{% include 'display_name_form.html' %}{% endwith %}
     <h3>Stats</h3>
     {% include 'profile_totals.html' %}
     <p><a href="{{ url_for('profile.stats_page') }}">View stats and letter ranks</a></p>

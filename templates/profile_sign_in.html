@@ -1,11 +1,11 @@
 {% if profile_user %}
-    <p class="profile-note">Signed in with Google. Your stats sync across devices.</p>
+    <p class="profile-note">Signed in with Google. Your stats are saved in Anagrams’ private app data and sync across devices.</p>
     <form method="post" action="{{ url_for('profile.sign_out') }}">
         <input type="hidden" name="token" value="{{ profile_logout_token() }}">
         <button type="submit" class="btn btn-blue profile-action">Sign out</button>
     </form>
 {% else %}
-    <p class="profile-note">Guest stats last for this browser tab. Sign in to keep your progress.</p>
+    <p class="profile-note">Guest stats last for this browser tab. Sign in to save your progress to your Google account.</p>
     {% if profile_google_enabled %}
     <a class="btn btn-blue profile-action" href="{{ url_for('profile.google_login') }}">Sign in with Google</a>
     {% else %}

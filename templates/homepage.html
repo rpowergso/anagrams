@@ -1,6 +1,9 @@
 {% extends "layout.html" %}
 {% block content %}
 <div class="home-shell">
+    <div class="home-toolbar">
+        <button type="button" class="profile-open" id="open-profile" aria-controls="home-profile" aria-expanded="true">Your Profile</button>
+    </div>
     <!-- The Big "Pretty" Title -->
     <h1 style="font-size: 4.5rem; text-shadow: 0 8px 0 var(--tile-shadow); margin-bottom: 60px; letter-spacing: 4px;">ANAGRAMS</h1>
     <script src="{{ url_for('static', filename='js/display-name.js') }}"></script>
@@ -60,7 +63,10 @@
 
 <style>
     .home-shell { text-align: center; padding: 50px; }
-    .home-with-profile { display: grid; grid-template-columns: minmax(0, 1fr) minmax(230px, 290px); align-items: start; gap: 24px; max-width: 1230px; margin: 0 auto; }
+    .home-toolbar { display: flex; justify-content: flex-end; max-width: 1230px; margin: 0 auto; }
+    .home-with-profile { display: grid; grid-template-columns: minmax(0, 1fr) minmax(250px, 310px); align-items: start; gap: 24px; max-width: 1230px; margin: 0 auto; }
+    .home-modes { min-width: 0; }
+    .home-with-profile:has(.profile-panel[hidden]) { grid-template-columns: minmax(0, 900px); }
     .home-with-profile .menu-card { padding-inline: 20px; }
     .home-top-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px; max-width: 900px; margin: 0 auto; }
     .home-bottom-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px; max-width: 865px; margin: 55px auto 0; }
@@ -96,7 +102,10 @@
 
     @media (max-width: 900px) {
         .home-with-profile { grid-template-columns: minmax(0, 1fr); }
-        .home-with-profile .profile-panel { grid-row: 1; }
+        .home-with-profile .profile-panel {
+            position: fixed; top: 12px; right: 12px; bottom: 12px; z-index: 5;
+            width: min(310px, calc(100vw - 24px)); overflow-y: auto; box-sizing: border-box;
+        }
     }
     @media (max-width: 768px) {
         .home-shell { padding: 30px 18px; }
