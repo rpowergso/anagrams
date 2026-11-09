@@ -15,9 +15,11 @@
         CODE: <span style="color: white; font-weight: bold;">{{ room_id }}</span>
     </div>
 
-    <!-- HOST ONLY SETTINGS -->
+    <!-- ROOM SETTINGS -->
     <div id="host-controls" class="lobby-settings-card" style="display: none; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; margin-bottom: 25px; border: 1px dashed rgba(255,255,255,0.2);">
-        <h3 style="margin-top: 0; font-size: 0.9rem; color: #f1c40f;">HOST SETTINGS 👑</h3>
+        <h3 style="margin-top: 0; font-size: 0.9rem; color: #f1c40f;">ROOM SETTINGS</h3>
+        {% include "display_name_form.html" %}
+        <h4 style="font-size: 0.8rem; color: #f1c40f;">HOST CONTROLS 👑</h4>
         <div class="lobby-settings-grid" style="display: flex; justify-content: space-around; gap: 15px; flex-wrap: wrap;">
             <div class="lobby-setting" style="flex: 1;">
                 <label for="setting-preset" style="display: block; font-size: 0.8rem; margin-bottom: 5px;">TILE SET</label>
@@ -164,6 +166,7 @@
 
 <!-- Libraries -->
 <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+<script src="{{ url_for('static', filename='js/display-name.js') }}"></script>
 <script src="{{ url_for('static', filename='js/multiplayer.js') }}"></script>
 
 <style>

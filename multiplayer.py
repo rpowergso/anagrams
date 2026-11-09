@@ -308,6 +308,8 @@ def on_join(data):
         if previous_sid in game['players']:
             join_room(room)
             player = game['players'].pop(previous_sid)
+            if game['status'] == 'lobby':
+                player['username'] = username
             player['connected'] = True
             player['disconnected_at'] = None
             game['players'][request.sid] = player
@@ -358,6 +360,23 @@ def on_join(data):
         game['player_order'].append(new_bot_sid)
     
     emit('lobby_update', game, room=room)
+
+@socketio.on('rename_player')
+def on_rename_player(data):
+    if event_limited('rename_player', 20):
+        return {'error': 'Too many name changes. Please wait.'}
+    room, game = event_room(data)
+    if not game or game['status'] != 'lobby':
+        return {'error': 'You can change your name while in the lobby.'}
+    username = clean_username(data.get('username'))
+    if username is None:
+        return {'error': 'Enter a valid display name between 1 and 24 characters.'}
+    player = game['players'][request.sid]
+    if player['username'] != username:
+        player['username'] = username
+        emit_room_state(game, room)
+    return {'username': username}
+
 
 @socketio.on('claim_word')
 def on_claim_word(data):

@@ -3,6 +3,12 @@
 <div class="home-shell">
     <!-- The Big "Pretty" Title -->
     <h1 style="font-size: 4.5rem; text-shadow: 0 8px 0 var(--tile-shadow); margin-bottom: 60px; letter-spacing: 4px;">ANAGRAMS</h1>
+    <details style="margin: 0 auto 24px;">
+        <summary style="cursor: pointer; margin-bottom: 12px;">Settings</summary>
+        {% include "display_name_form.html" %}
+    </details>
+    <script src="{{ url_for('static', filename='js/display-name.js') }}"></script>
+    <script>setupDisplayNameForm();</script>
     <!-- Multiplayer/bot lobbies and solo modes -->
     <div class="home-top-row">
         

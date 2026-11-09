@@ -1,12 +1,5 @@
 const socket = io();
-let myUsername = localStorage.getItem('anagramsMultiplayerUsername') ||
-    sessionStorage.getItem('anagramsMultiplayerUsername') || "";
-const safeUsernamePattern = /^[\p{L}\p{N} _.'-]+$/u;
-if (myUsername.length > 24 || !safeUsernamePattern.test(myUsername)) {
-    sessionStorage.removeItem('anagramsMultiplayerUsername');
-    localStorage.removeItem('anagramsMultiplayerUsername');
-    myUsername = "";
-}
+let myUsername = getDisplayName();
 let mySid = "";
 let joinedSocketId = "";
 const reconnectStorageKey = `anagramsReconnectToken:${ROOM_ID}`;
@@ -39,6 +32,22 @@ function escapeHtml(value) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    setupDisplayNameForm(async name => {
+        if (!socket.connected) throw new Error('Reconnect to the room to change your name.');
+        const result = await new Promise((resolve, reject) => {
+            const timeout = window.setTimeout(() => {
+                reject(new Error('The room did not respond. Try saving again.'));
+            }, 5000);
+            socket.emit('rename_player', { room: ROOM_ID, username: name }, response => {
+                window.clearTimeout(timeout);
+                resolve(response);
+            });
+        });
+        if (result.error) throw new Error(result.error);
+        myUsername = result.username;
+        return myUsername;
+    });
+
     // 1. Show custom username popup
     if (myUsername) {
         joinCurrentSocket();
@@ -952,16 +961,16 @@ function showUsernamePopup() {
 
 function confirmUsername() {
     const input = document.getElementById('username-input');
-    const username = input.value.trim() || "Player_" + Math.floor(Math.random() * 1000);
-    if (username.length > 24 || !safeUsernamePattern.test(username)) {
+    const username = cleanDisplayName(input.value.trim() || "Player_" + Math.floor(Math.random() * 1000));
+    if (!username) {
         input.setCustomValidity("Use 1–24 letters, numbers, spaces, apostrophes, periods, hyphens, or underscores.");
         input.reportValidity();
         return;
     }
     input.setCustomValidity('');
     myUsername = username;
-    sessionStorage.setItem('anagramsMultiplayerUsername', myUsername);
-    localStorage.setItem('anagramsMultiplayerUsername', myUsername);
+    saveDisplayName(myUsername);
+    document.getElementById('display-name').value = myUsername;
     
     // Remove modal
     const modals = document.querySelectorAll('div[style*="z-index: 10000"]');
