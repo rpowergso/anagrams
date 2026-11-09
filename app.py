@@ -17,6 +17,7 @@ from flask_socketio import SocketIO
 from game import (check_dictionary, choose_bot_move, generate_tiles, same_root, get_hints,
                   find_word_extensions, generate_ranked_puzzle, calculate_ranked_delta)
 from constants import TILE_COUNT, AUTODRAW_INTERVAL_MS, MIN_WORD_LENGTH
+from profile_stats import init_profile
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
@@ -26,6 +27,7 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = os.environ.get('COOKIE_SECURE', '').lower() == 'true'
 Session(app)
+init_profile(app)
 ranked_puzzles = {}
 RANKED_MAX_STRIKES = 3
 definition_cache = {}

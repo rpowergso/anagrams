@@ -1,0 +1,10 @@
+<dl class="profile-totals">
+    <div><dt>Games played</dt><dd data-profile-stat="games">0</dd></div>
+    <div><dt>Wins</dt><dd data-profile-stat="wins">0</dd></div>
+    <div><dt>Words played</dt><dd data-profile-stat="words">0</dd></div>
+    {% if show_puzzles %}
+    <div><dt>Puzzles played</dt><dd data-profile-stat="puzzles">0</dd></div>
+    <div><dt>Puzzles solved</dt><dd data-profile-stat="solved">0</dd></div>
+    {% endif %}
+</dl>
+<p data-profile-sync-error hidden>Saved stats could not be loaded or updated. <button type="button">Retry</button></p>

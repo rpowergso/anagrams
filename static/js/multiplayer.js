@@ -134,6 +134,8 @@ socket.on('end_game_vote', (data) => {
     }
 });
 
+socket.on('profile_progress', event => anagramsProgress.record(event));
+
 socket.on('game_ended', (data) => {
     gameHasEnded = true;
     gameInProgress = false;
@@ -597,6 +599,7 @@ function renderPlayers(players, playerOrder) {
         section.querySelectorAll('[data-board-word]').forEach(button => {
             button.addEventListener('click', () => showBoardWordDefinition(button.dataset.boardWord));
         });
+        if (isMe) anagramsProgress.colorTiles(section);
         board.appendChild(section);
     }
 }

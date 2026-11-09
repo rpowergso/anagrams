@@ -441,6 +441,8 @@ def on_claim_word(data):
         game['players'][sid]['incorrect_attempts'] = 0
         give_word_winner_next_draw(game, sid)
         
+        emit('profile_progress', {'word': word}, to=sid)
+
         # Broadcast action
         player_name = game['players'][sid]['username']
         emit('player_action', {
@@ -480,6 +482,8 @@ def on_claim_word(data):
                 game['players'][sid]['incorrect_attempts'] = 0
                 give_word_winner_next_draw(game, sid)
                 
+                emit('profile_progress', {'word': word}, to=sid)
+
                 # Broadcast action
                 stealer_name = game['players'][sid]['username']
                 victim_name = player['username']
@@ -744,6 +748,12 @@ def finish_game(room, game):
         final_scores[sid] = player['score']
     
     game['status'] = 'ended'
+    best_score = max(final_scores.values(), default=0)
+    winners = [sid for sid, score in final_scores.items() if score == best_score]
+    for sid, player in game['players'].items():
+        if not player.get('is_bot'):
+            won = best_score > 0 and len(final_scores) > 1 and winners == [sid]
+            socketio.emit('profile_progress', {'result': 'win' if won else 'game'}, to=sid)
     socketio.emit('game_ended', {
         'final_scores': final_scores,
         'players': game['players']

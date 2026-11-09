@@ -2,6 +2,7 @@ let soloInterval = null;
 let soloAutoDraw = false;
 let countdownInterval = null;
 let soloSubmissionPending = false;
+let soloFinished = false;
 
 function setSoloCountdown(ms) {
     const display = document.getElementById('solo-countdown');
@@ -60,6 +61,9 @@ async function drawTile() {
 }
 
 function showSoloGameOver() {
+    if (soloFinished) return;
+    soloFinished = true;
+    anagramsProgress.record({ result: 'game' });
     const score = parseInt(document.getElementById('playerTotalScore')?.innerText || 0);
     
     const modal = document.createElement('div');
@@ -119,6 +123,7 @@ async function checkWord() {
         if (data.valid) {
             activeTiles = removeWordFromTiles(word, activeTiles);
             myWords.push(word);
+            anagramsProgress.record({ word });
             renderTiles();
             renderSoloWords(); // Uses function in gamefunctions.js
             input.value = '';
@@ -140,6 +145,7 @@ async function checkWord() {
                 myWords = myWords.filter(w => w.toUpperCase() !== steal.stolenWord.toUpperCase());
                 activeTiles = steal.newActiveTiles;
                 myWords.push(word);
+                anagramsProgress.record({ word });
                 renderTiles();
                 renderSoloWords();
                 input.value = '';

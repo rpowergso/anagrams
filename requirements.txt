@@ -4,3 +4,5 @@ flask-session
 gunicorn
 wordfreq
 nltk
+Authlib>=1.6.5
+requests

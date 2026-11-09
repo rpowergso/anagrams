@@ -30,7 +30,7 @@ function renderTiles() {
     });
 }
 
-function renderWordsTo(elementId, words, scoreElementId) {
+function renderWordsTo(elementId, words, scoreElementId, useCosmetics = true) {
     const container = document.getElementById(elementId);
     const scoreDisplay = document.getElementById(scoreElementId);
     if (!container) return;
@@ -58,11 +58,12 @@ function renderWordsTo(elementId, words, scoreElementId) {
 
         container.appendChild(block);
     });
+    if (useCosmetics) anagramsProgress.colorTiles(container);
     if (scoreDisplay) scoreDisplay.innerText = totalScore;
 }
 
 function renderPlayerWords() { renderWordsTo('playerWords', playerWords, 'playerTotalScore'); }
-function renderBotWords() { renderWordsTo('botWords', botWords, 'botTotalScore'); }
+function renderBotWords() { renderWordsTo('botWords', botWords, 'botTotalScore', false); }
 function renderSoloWords() { renderWordsTo('myWords', myWords, 'playerTotalScore'); }
 
 function removeWordFromTiles(word, tiles) {

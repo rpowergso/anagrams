@@ -31,6 +31,12 @@ async function loadRankedPuzzle(){
   byId('rankedInput').value='';byId('rankedInput').focus();
 }
 function finishRanked(data,solved){
+  anagramsProgress.record({ word: solved ? data.word : undefined, result: solved ? 'solve' : 'puzzle' });
+  if (solved) {
+    const playedWord = tileWord(data.word, 'word-block');
+    anagramsProgress.colorTiles(playedWord);
+    byId('rankedAnswers').prepend(playedWord);
+  }
   rankedProfile.elo=data.newElo;rankedProfile.played++;rankedProfile.streak=solved?rankedProfile.streak+1:0;
   if(solved){rankedProfile.solved++;rankedProfile.totalTime+=data.elapsed;rankedProfile.bestStreak=Math.max(rankedProfile.bestStreak,rankedProfile.streak)}saveRanked();
   byId('rankedForm').hidden=true;byId('rankedNext').hidden=false;rankedPuzzle=null;rankedSubmitting=false;

@@ -1,0 +1,22 @@
+{% extends "layout.html" %}
+{% block content %}
+<main class="profile-panel stats-page">
+    <a href="{{ url_for('index') }}">Back to Anagrams</a>
+    <h1>Your Stats</h1>
+    {% if sign_in_error %}<p role="alert">Google sign-in did not finish. You can try again below.</p>{% endif %}
+    {% with show_puzzles=true %}{% include 'profile_totals.html' %}{% endwith %}
+    <h2>Letter Ranks</h2>
+    <p>Every letter in a valid word earns one use, including repeats. Select a letter to see its progress.</p>
+    <div class="profile-letter-grid">
+        {% for letter in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' %}
+        <button type="button" class="tile small" data-letter-detail="{{ letter }}" aria-pressed="false">{{ letter }}</button>
+        {% endfor %}
+    </div>
+    <p id="letter-rank-detail" role="status"></p>
+    <label for="letter-color-choice">Tile color for selected letter</label>
+    <select id="letter-color-choice"></select>
+    <p class="profile-note">Green unlocks at 50 uses, Blue at 150, Purple at 500, Gold at 1,000, and Ruby at 2,500. Auto equips the highest unlocked color.</p>
+    <label><input type="checkbox" id="letter-cosmetics"> Color my letter tiles</label>
+    {% include 'profile_sign_in.html' %}
+</main>
+{% endblock %}

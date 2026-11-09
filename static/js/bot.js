@@ -163,11 +163,13 @@ async function requestBotMove(isFinalAttempt = false) {
 }
 
 function endGameWithWinner() {
+    if (!botRunning) return;
     stopBot('');
     
     const playerScore = parseInt(document.getElementById('playerTotalScore')?.innerText || 0);
     const botScore = parseInt(document.getElementById('botTotalScore')?.innerText || 0);
     
+    anagramsProgress.record({ result: playerScore > botScore ? 'win' : 'game' });
     let resultText = '';
     if (playerScore > botScore) {
         resultText = `🎉 YOU WIN! ${playerScore} - ${botScore}`;
@@ -289,6 +291,7 @@ async function checkPlayerWord() {
         if (data.valid) {
             activeTiles = removeWordFromTiles(word, activeTiles);
             playerWords.push(word);
+            anagramsProgress.record({ word });
             renderTiles();
             renderPlayerWords();
             input.value = '';
@@ -313,6 +316,7 @@ async function checkPlayerWord() {
                 
                 activeTiles = steal.newActiveTiles;
                 playerWords.push(word);
+                anagramsProgress.record({ word });
                 renderTiles();
                 renderPlayerWords();
                 renderBotWords();

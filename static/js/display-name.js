@@ -36,6 +36,7 @@ function setupDisplayNameForm(updateName = async name => name) {
             saveDisplayName(savedName);
             input.value = savedName;
             status.textContent = 'Display name saved.';
+            form.dispatchEvent(new Event('display-name-saved'));
         } catch (error) {
             status.textContent = error.message;
         } finally {

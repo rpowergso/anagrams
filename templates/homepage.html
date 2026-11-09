@@ -3,12 +3,9 @@
 <div class="home-shell">
     <!-- The Big "Pretty" Title -->
     <h1 style="font-size: 4.5rem; text-shadow: 0 8px 0 var(--tile-shadow); margin-bottom: 60px; letter-spacing: 4px;">ANAGRAMS</h1>
-    <details style="margin: 0 auto 24px;">
-        <summary style="cursor: pointer; margin-bottom: 12px;">Settings</summary>
-        {% include "display_name_form.html" %}
-    </details>
     <script src="{{ url_for('static', filename='js/display-name.js') }}"></script>
-    <script>setupDisplayNameForm();</script>
+    <div class="home-with-profile">
+    <div class="home-modes">
     <!-- Multiplayer/bot lobbies and solo modes -->
     <div class="home-top-row">
         
@@ -56,10 +53,15 @@
             <p>Find the best plays and climb the ratings with ranked word puzzles.</p>
         </div>
     </div>
+    </div>
+    {% include 'profile_panel.html' %}
+    </div>
 </div>
 
 <style>
     .home-shell { text-align: center; padding: 50px; }
+    .home-with-profile { display: grid; grid-template-columns: minmax(0, 1fr) minmax(230px, 290px); align-items: start; gap: 24px; max-width: 1230px; margin: 0 auto; }
+    .home-with-profile .menu-card { padding-inline: 20px; }
     .home-top-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px; max-width: 900px; margin: 0 auto; }
     .home-bottom-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px; max-width: 865px; margin: 55px auto 0; }
     .menu-link { display: block; text-decoration: none; padding: 16px; }
@@ -92,6 +94,10 @@
         }
     }
 
+    @media (max-width: 900px) {
+        .home-with-profile { grid-template-columns: minmax(0, 1fr); }
+        .home-with-profile .profile-panel { grid-row: 1; }
+    }
     @media (max-width: 768px) {
         .home-shell { padding: 30px 18px; }
         .home-shell h1 { font-size: clamp(2.4rem, 10vw, 4.5rem) !important; }

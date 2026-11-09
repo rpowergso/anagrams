@@ -67,8 +67,10 @@
             letter-spacing: 2px;
         }
     </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='profile.css') }}">
 </head>
-<body>
+<body data-profile-signed-in="{{ 'true' if profile_user else 'false' }}">
+    <script src="{{ url_for('static', filename='js/profile-stats.js') }}"></script>
     {% block content %}{% endblock %}
 </body>
 </html>
