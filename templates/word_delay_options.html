@@ -1,0 +1,3 @@
+{% for mode, delay_ms in word_delays.items() %}
+<option value="{{ mode }}" data-delay-ms="{{ delay_ms }}"{% if mode == default_word_delay %} selected{% endif %}>{{ mode | capitalize }}</option>
+{% endfor %}

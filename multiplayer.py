@@ -8,6 +8,7 @@ from flask import request
 from flask_socketio import emit, join_room
 
 from app import socketio
+from constants import DEFAULT_WORD_DELAY, WORD_DELAYS_MS
 from game import generate_tiles, check_dictionary, same_root, choose_bot_move
 
 rooms = {}
@@ -17,6 +18,17 @@ MAX_PLAYERS_PER_ROOM = 8
 MAX_USERNAME_LENGTH = 24
 MAX_WORD_LENGTH = 30
 BOT_DIFFICULTIES = {'easy', 'medium', 'hard'}
+DEFAULT_SETTINGS = {
+    'tile_preset': 'bananagrams',
+    'max_tiles': 144,
+    'draw_time': 20,
+    'autodraw_enabled': True,
+    'incorrect_word_penalty': False,
+    'word_winner_draws_next': True,
+    'prefire_enabled': True,
+    'paste_allowed': False,
+    'word_delay': DEFAULT_WORD_DELAY,
+}
 reconnect_tokens = {}
 sid_tokens = {}
 room_bans = defaultdict(set)
@@ -122,16 +134,13 @@ def run_bot_turn(room, sid):
     game = rooms.get(room)
     if not game:
         return
+    round_number = game['round_number']
     difficulty = game['players'].get(sid, {}).get('difficulty', 'medium')
     move = choose_bot_move(game['active_pool'][:], all_board_words(game), difficulty)
     delay = move.get('delay', 0.8) if move.get('found') else 0.8
     socketio.sleep(max(0.35, min(float(delay), game['settings'].get('draw_time', 20))))
 
-    game = rooms.get(room)
-    if (not game or game.get('status') != 'playing' or not game.get('player_order')
-            or game['player_order'][game['turn_index']] != sid):
-        if game:
-            game['bot_turn_pending'] = False
+    if not bot_still_has_turn(room, game, sid, round_number):
         return
 
     if move.get('found') and apply_bot_move(game, sid, move):
@@ -139,14 +148,10 @@ def run_bot_turn(room, sid):
         action = (f'Bot stole "{source}" to make "{move["word"]}"'
                   if source else f'Bot played "{move["word"]}"')
         socketio.emit('player_action', {'message': action}, room=room)
-        socketio.emit('update_board', game, room=room)
+        emit_room_state(game, room)
         socketio.sleep(0.45)
 
-    game = rooms.get(room)
-    if (not game or game.get('status') != 'playing' or not game.get('player_order')
-            or game['player_order'][game['turn_index']] != sid):
-        if game:
-            game['bot_turn_pending'] = False
+    if not bot_still_has_turn(room, game, sid, round_number):
         return
 
     if not game['tiles'] and game.get('zen_mode'):
@@ -158,8 +163,19 @@ def run_bot_turn(room, sid):
         game['active_pool'].append(game['tiles'].pop(0))
         game['turn_index'] = (game['turn_index'] + 1) % len(game['player_order'])
     game['bot_turn_pending'] = False
-    socketio.emit('update_board', game, room=room)
+    emit_room_state(game, room)
     schedule_bot_turn(room)
+
+
+def bot_still_has_turn(room, game, sid, round_number):
+    if rooms.get(room) is not game or game['round_number'] != round_number:
+        return False
+    if (game['status'] == 'playing' and game['player_order']
+            and game['player_order'][game['turn_index']] == sid):
+        return True
+    game['bot_turn_pending'] = False
+    schedule_bot_turn(room)
+    return False
 
 
 def clean_username(value):
@@ -200,9 +216,12 @@ def event_room(data, require_player=True):
     return room, game
 
 
-def emit_room_state(game, room):
-    event = 'lobby_update' if game['status'] == 'lobby' else 'update_board'
-    socketio.emit(event, game, room=room)
+def emit_room_state(game, room, event=None):
+    if event is None:
+        event = 'lobby_update' if game['status'] == 'lobby' else 'update_board'
+    board = {key: value for key, value in game.items() if key != 'tiles'}
+    board['tiles_remaining'] = len(game['tiles'])
+    socketio.emit(event, board, to=room)
 
 
 def incorrect_attempt_limit(game):
@@ -216,7 +235,7 @@ def incorrect_attempt_limit(game):
 
 
 def reject_word(game, sid, message):
-    if not game['settings'].get('incorrect_word_penalty', True):
+    if not game['settings'].get('incorrect_word_penalty', DEFAULT_SETTINGS['incorrect_word_penalty']):
         emit('error_message', {'msg': message}, room=sid)
         return
 
@@ -272,6 +291,9 @@ def on_join(data):
         return
     
     if room not in rooms:
+        if data.get('observe') is True:
+            emit('room_closed', to=request.sid)
+            return
         initial_bot_difficulty = data.get('initial_bot_difficulty', '')
         if initial_bot_difficulty not in BOT_DIFFICULTIES:
             initial_bot_difficulty = ''
@@ -279,19 +301,11 @@ def on_join(data):
             'status': 'lobby',
             'host_sid': request.sid,
             'zen_mode': False,
-            'settings': {
-                'tile_preset': 'standard',
-                'max_tiles': 60,
-                'draw_time': 20,
-                'autodraw_enabled': True,
-                'incorrect_word_penalty': True,
-                'word_winner_draws_next': False,
-                'prefire_enabled': False,
-                'paste_allowed': True,
-            },
+            'settings': DEFAULT_SETTINGS.copy(),
             'tiles': [],
             'active_pool': [],
             'turn_index': 0,
+            'round_number': 0,
             'player_order': [],
             'players': {},
             'bot_turn_pending': False,
@@ -327,8 +341,12 @@ def on_join(data):
             emit_room_state(game, room)
             return
 
-    if game['status'] == 'playing':
-        emit('error_message', {'msg': 'Game already in progress'}, room=request.sid)
+    if request.sid in game['players']:
+        emit_room_state(game, request.sid)
+        return
+    if game['status'] != 'lobby' or data.get('observe') is True:
+        join_room(room)
+        emit_room_state(game, request.sid)
         return
     if len(game['players']) >= MAX_PLAYERS_PER_ROOM:
         emit('error_message', {'msg': 'This room is full.'}, room=request.sid)
@@ -359,7 +377,7 @@ def on_join(data):
         game['players'][new_bot_sid] = make_bot(initial_bot_difficulty)
         game['player_order'].append(new_bot_sid)
     
-    emit('lobby_update', game, room=room)
+    emit_room_state(game, room)
 
 @socketio.on('rename_player')
 def on_rename_player(data):
@@ -403,9 +421,14 @@ def on_claim_word(data):
         emit('error_message', {'msg': 'Game is not in progress!'}, room=sid)
         return
 
-    if sid not in game['players']:
-        emit('error_message', {'msg': 'Player not found in game!'}, room=sid)
-        return
+    delay = WORD_DELAYS_MS[game['settings'].get('word_delay', DEFAULT_WORD_DELAY)]
+    if delay:
+        round_number = game['round_number']
+        socketio.sleep(delay / 1000)
+        if (rooms.get(room) is not game or game['status'] != 'playing'
+                or game['round_number'] != round_number or sid not in game['players']
+                or not game['players'][sid]['connected']):
+            return
 
     silence_remaining = math.ceil(game['players'][sid].get('silenced_until', 0) - time.time())
     if silence_remaining > 0:
@@ -449,7 +472,7 @@ def on_claim_word(data):
             'message': f"✓ {player_name} played \"{word}\""
         }, room=room)
         
-        emit('update_board', game, room=room)
+        emit_room_state(game, room)
         return
 
     # 2. Try to steal from any player
@@ -491,7 +514,7 @@ def on_claim_word(data):
                     'message': f"🔥 {stealer_name} STOLE \"{existing_word}\" from {victim_name} to make \"{word}\""
                 }, room=room)
                 
-                emit('update_board', game, room=room)
+                emit_room_state(game, room)
                 return
 
     reject_word(game, sid, 'Cannot form word with available tiles')
@@ -499,14 +522,14 @@ def on_claim_word(data):
 @socketio.on('update_settings')
 def on_update_settings(data):
     room, game = event_room(data)
-    if game and request.sid == game['host_sid']:
-        preset = data.get('tile_preset', 'custom')
+    if game and game['status'] == 'lobby' and request.sid == game['host_sid']:
+        preset = data.get('tile_preset', game['settings']['tile_preset'])
         if preset not in ('standard', 'bananagrams', 'custom'):
             preset = 'custom'
         preset_counts = {'standard': 60, 'bananagrams': 144}
         try:
-            custom_count = int(data.get('max_tiles', 60))
-            draw_time = int(data.get('draw_time', 20))
+            custom_count = int(data.get('max_tiles', game['settings']['max_tiles']))
+            draw_time = int(data.get('draw_time', game['settings']['draw_time']))
         except (TypeError, ValueError):
             emit('error_message', {'msg': 'Invalid game settings.'}, room=request.sid)
             return
@@ -522,33 +545,36 @@ def on_update_settings(data):
         )
         penalty_value = data.get(
             'incorrect_word_penalty',
-            game['settings'].get('incorrect_word_penalty', True)
+            game['settings'].get('incorrect_word_penalty', DEFAULT_SETTINGS['incorrect_word_penalty'])
         )
         game['settings']['incorrect_word_penalty'] = (
             penalty_value is True or str(penalty_value).lower() == 'true'
         )
         winner_draw_value = data.get(
             'word_winner_draws_next',
-            game['settings'].get('word_winner_draws_next', False)
+            game['settings'].get('word_winner_draws_next', DEFAULT_SETTINGS['word_winner_draws_next'])
         )
         game['settings']['word_winner_draws_next'] = (
             winner_draw_value is True or str(winner_draw_value).lower() == 'true'
         )
         prefire_value = data.get(
             'prefire_enabled',
-            game['settings'].get('prefire_enabled', False)
+            game['settings'].get('prefire_enabled', DEFAULT_SETTINGS['prefire_enabled'])
         )
         game['settings']['prefire_enabled'] = (
             prefire_value is True or str(prefire_value).lower() == 'true'
         )
         paste_value = data.get(
             'paste_allowed',
-            game['settings'].get('paste_allowed', True)
+            game['settings'].get('paste_allowed', DEFAULT_SETTINGS['paste_allowed'])
         )
         game['settings']['paste_allowed'] = (
             paste_value is True or str(paste_value).lower() == 'true'
         )
-        emit('lobby_update', game, room=room)
+        word_delay = data.get('word_delay')
+        if isinstance(word_delay, str) and word_delay in WORD_DELAYS_MS:
+            game['settings']['word_delay'] = word_delay
+        emit_room_state(game, room)
 
 
 @socketio.on('add_bot')
@@ -564,7 +590,7 @@ def on_add_bot(data):
     new_bot_sid = bot_sid()
     game['players'][new_bot_sid] = make_bot(difficulty)
     game['player_order'].append(new_bot_sid)
-    emit('lobby_update', game, room=room)
+    emit_room_state(game, room)
 
 
 @socketio.on('remove_bot')
@@ -576,7 +602,7 @@ def on_remove_bot(data):
         return
     game['players'].pop(target_sid, None)
     game['player_order'] = [sid for sid in game['player_order'] if sid != target_sid]
-    emit('lobby_update', game, room=room)
+    emit_room_state(game, room)
 
 
 @socketio.on('update_bot_difficulty')
@@ -589,7 +615,7 @@ def on_update_bot_difficulty(data):
             or difficulty not in BOT_DIFFICULTIES):
         return
     game['players'][target_sid]['difficulty'] = difficulty
-    emit('lobby_update', game, room=room)
+    emit_room_state(game, room)
 
 
 @socketio.on('kick_player')
@@ -607,14 +633,14 @@ def on_kick_player(data):
     game['players'].pop(target_sid, None)
     game['player_order'] = [sid for sid in game['player_order'] if sid != target_sid]
     socketio.emit('kicked', {'msg': 'The host removed you from this lobby.'}, room=target_sid)
-    emit('lobby_update', game, room=room)
+    emit_room_state(game, room)
 
 @socketio.on('toggle_ready')
 def on_toggle_ready(data):
     room, game = event_room(data)
-    if game:
+    if game and game['status'] == 'lobby':
         game['players'][request.sid]['ready'] = not game['players'][request.sid]['ready']
-        emit('lobby_update', game, room=room)
+        emit_room_state(game, room)
 
 @socketio.on('start_game')
 def on_start(data):
@@ -626,6 +652,8 @@ def on_start(data):
     
     if request.sid != game['host_sid']:
         emit('error_message', {'msg': 'Only the host can start the game!'}, room=request.sid)
+        return
+    if game['status'] != 'lobby':
         return
     
     human_players = [
@@ -640,6 +668,7 @@ def on_start(data):
         emit('error_message', {'msg': 'Not everyone is ready!'}, room=request.sid)
         return
     
+    game['round_number'] += 1
     game['status'] = 'playing'
     game['zen_mode'] = (
         len(human_players) == 1
@@ -650,7 +679,7 @@ def on_start(data):
         preset=game['settings'].get('tile_preset', 'standard')
     )
     game['end_game_votes'] = {}  # Initialize end game votes
-    emit('game_start', game, room=room)
+    emit_room_state(game, room, 'game_start')
     schedule_bot_turn(room)
 
 @socketio.on('draw_tile')
@@ -687,7 +716,7 @@ def on_draw(data):
         game['active_pool'].append(tile)
         # Advance turn
         game['turn_index'] = (game['turn_index'] + 1) % len(game['player_order'])
-        emit('update_board', game, room=room)
+        emit_room_state(game, room)
         schedule_bot_turn(room)
     else:
         emit('error_message', {'msg': 'No tiles left to draw!'}, room=room)
@@ -782,7 +811,7 @@ def on_replay_game(data):
     game['zen_mode'] = False
     game['bot_turn_pending'] = False
 
-    emit('lobby_update', game, room=room)
+    emit_room_state(game, room)
 
 
 @socketio.on('disconnect')
@@ -833,6 +862,8 @@ def remove_expired_ghost(room, sid, reconnect_token, disconnected_at):
     if not game['player_order']:
         rooms.pop(room, None)
         room_bans.pop(room, None)
+        socketio.emit('room_closed', to=room)
+        socketio.close_room(room)
         return
     game['turn_index'] %= len(game['player_order'])
 
@@ -844,6 +875,8 @@ def remove_expired_ghost(room, sid, reconnect_token, disconnected_at):
         if next_host is None:
             rooms.pop(room, None)
             room_bans.pop(room, None)
+            socketio.emit('room_closed', to=room)
+            socketio.close_room(room)
             return
         game['host_sid'] = next_host
         game['players'][next_host]['is_host'] = True

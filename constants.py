@@ -3,6 +3,8 @@
 TILE_COUNT = 60
 AUTODRAW_INTERVAL_MS = 3500 
 MIN_WORD_LENGTH = 3
+WORD_DELAYS_MS = {'snappy': 0, 'balanced': 250, 'classic': 750}
+DEFAULT_WORD_DELAY = 'balanced'
 
 # Zipf frequency > 4.0 is generally considered a "common" word
 COMMON_WORD_THRESHOLD = 4.0 

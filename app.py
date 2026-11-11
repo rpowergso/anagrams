@@ -16,7 +16,8 @@ from flask_socketio import SocketIO
 # FIXED: Import correctly from respective files
 from game import (check_dictionary, choose_bot_move, generate_tiles, same_root, get_hints,
                   find_word_extensions, generate_ranked_puzzle, calculate_ranked_delta)
-from constants import TILE_COUNT, AUTODRAW_INTERVAL_MS, MIN_WORD_LENGTH
+from constants import (TILE_COUNT, AUTODRAW_INTERVAL_MS, MIN_WORD_LENGTH,
+                       DEFAULT_WORD_DELAY, WORD_DELAYS_MS)
 from profile_stats import init_profile
 
 app = Flask(__name__)
@@ -242,6 +243,8 @@ def multiplayer_game(room_id):
         bot = ''
     return render_template('multiplayergamescreen.html', 
                            room_id=room_id,
+                           word_delays=WORD_DELAYS_MS,
+                           default_word_delay=DEFAULT_WORD_DELAY,
                            initial_bot_difficulty=bot,
                            tile_count=TILE_COUNT, 
                            autodraw_interval=AUTODRAW_INTERVAL_MS)
@@ -253,14 +256,18 @@ def solo_game():
     session['tiles'] = generate_tiles()
     session['zen_mode'] = False
     session.modified = True
-    return render_template('sologamescreen.html', tile_count=TILE_COUNT, autodraw_interval=AUTODRAW_INTERVAL_MS)
+    return render_template('sologamescreen.html', tile_count=TILE_COUNT,
+                           autodraw_interval=AUTODRAW_INTERVAL_MS,
+                           word_delays=WORD_DELAYS_MS, default_word_delay=DEFAULT_WORD_DELAY)
 
 @app.route('/zengamescreen')
 def zen_game():
     session['tiles'] = generate_tiles()
     session['zen_mode'] = True
     session.modified = True
-    return render_template('zengamescreen.html', tile_count=TILE_COUNT, autodraw_interval=AUTODRAW_INTERVAL_MS)
+    return render_template('zengamescreen.html', tile_count=TILE_COUNT,
+                           autodraw_interval=AUTODRAW_INTERVAL_MS,
+                           word_delays=WORD_DELAYS_MS, default_word_delay=DEFAULT_WORD_DELAY)
 
 @app.route('/botgamescreen', methods=['POST'])
 def bot_game():

@@ -10,6 +10,7 @@
 <!-- 1. THE LOBBY (Shown by default) -->
 <div id="lobby-container" class="lobby-shell" style="max-width: 600px; margin: 40px auto; padding: 30px; background: var(--board-color); border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center;">
     <h1 style="margin-bottom: 10px; letter-spacing: 2px;">GAME LOBBY</h1>
+    <p id="lobby-spectator-label" hidden>SPECTATING</p>
     <p id="lobby-mode-label" style="margin: -2px 0 18px; color: #b7c7d6;">MULTIPLAYER / BOT</p>
     <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 10px; font-family: monospace; font-size: 1.5rem; color: #3498db; margin-bottom: 25px;">
         CODE: <span style="color: white; font-weight: bold;">{{ room_id }}</span>
@@ -26,13 +27,13 @@
                 <select id="setting-preset" onchange="applyTilePreset()"
                         style="width: 90%; padding: 8px; border-radius: 5px; border: none; text-align: center; font-weight: bold;">
                     <option value="standard">STANDARD (60)</option>
-                    <option value="bananagrams">BANANAGRAMS (144)</option>
+                    <option value="bananagrams" selected>BANANAGRAMS (144)</option>
                     <option value="custom">CUSTOM</option>
                 </select>
             </div>
             <div class="lobby-setting" style="flex: 1;">
                 <label for="setting-tiles" style="display: block; font-size: 0.8rem; margin-bottom: 5px;">TOTAL TILES</label>
-                <input type="number" id="setting-tiles" value="60" min="20" max="144" onchange="useCustomTileCount()"
+                <input type="number" id="setting-tiles" value="144" min="20" max="144" onchange="useCustomTileCount()"
                        style="width: 80%; padding: 8px; border-radius: 5px; border: none; text-align: center; font-weight: bold;">
             </div>
             <div class="lobby-setting" style="flex: 1;">
@@ -53,7 +54,7 @@
                 <select id="setting-penalty" onchange="updateSettings()"
                         style="width: 80%; padding: 8px; border-radius: 5px; border: none; text-align: center; font-weight: bold;">
                     <option value="true">YES</option>
-                    <option value="false">NO</option>
+                    <option value="false" selected>NO</option>
                 </select>
             </div>
             <div class="lobby-setting" style="flex: 1;">
@@ -61,7 +62,7 @@
                 <select id="setting-winner-draws" onchange="updateSettings()"
                         style="width: 80%; padding: 8px; border-radius: 5px; border: none; text-align: center; font-weight: bold;">
                     <option value="false">NO</option>
-                    <option value="true">YES</option>
+                    <option value="true" selected>YES</option>
                 </select>
             </div>
             <div class="lobby-setting" style="flex: 1;">
@@ -69,7 +70,7 @@
                 <select id="setting-prefire" onchange="updateSettings()"
                         style="width: 80%; padding: 8px; border-radius: 5px; border: none; text-align: center; font-weight: bold;">
                     <option value="false">OFF</option>
-                    <option value="true">ON</option>
+                    <option value="true" selected>ON</option>
                 </select>
             </div>
             <div class="lobby-setting" style="flex: 1;">
@@ -77,7 +78,13 @@
                 <select id="setting-paste" onchange="updateSettings()"
                         style="width: 80%; padding: 8px; border-radius: 5px; border: none; text-align: center; font-weight: bold;">
                     <option value="true">ALLOWED</option>
-                    <option value="false">BLOCKED</option>
+                    <option value="false" selected>BLOCKED</option>
+                </select>
+            </div>
+            <div class="lobby-setting">
+                <label for="setting-word-delay">WORD DELAY</label>
+                <select id="setting-word-delay" onchange="updateSettings()">
+                    {% include "word_delay_options.html" %}
                 </select>
             </div>
         </div>
@@ -109,6 +116,7 @@
         <button class="btn btn-leave" onclick="confirmLeaveGame()">LEAVE</button>
         
         <div style="text-align: center;">
+            <div style="font-size: 0.85rem; margin-bottom: 4px;">ROOM <strong>{{ room_id }}</strong><span id="spectator-label" hidden> · SPECTATING</span></div>
             <div id="turn-indicator" style="font-weight: bold; font-size: 1.1rem; letter-spacing: 1px;">WAITING...</div>
             <div id="draw-timer-wrap" style="font-size: 0.8rem; opacity: 0.8;">AUTO-DRAW IN: <span id="draw-timer" style="color: #e74c3c; font-weight: bold; font-size: 1.1rem;">-</span>s</div>
         </div>
@@ -133,8 +141,10 @@
         <!-- Player word cards injected here -->
     </div>
 
+    <div id="spectator-action" role="status" style="text-align: center; color: #f39c12;" hidden></div>
+
     <!-- Input Footer -->
-    <div style="position: fixed; bottom: 0; width: 100%; background: #1a252f; padding: 20px; display: flex; justify-content: center; gap: 15px; z-index: 1000; border-top: 2px solid rgba(255,255,255,0.1);">
+    <div id="word-entry" style="position: fixed; bottom: 0; width: 100%; background: #1a252f; padding: 20px; display: flex; justify-content: center; gap: 15px; z-index: 1000; border-top: 2px solid rgba(255,255,255,0.1);">
         <div style="position: relative;">
             <div id="standbyWordDisplay" class="standby-word" hidden></div>
             <input type="text" id="wordInput" maxlength="30" placeholder="Type word..."
@@ -170,6 +180,8 @@
 <script src="{{ url_for('static', filename='js/multiplayer.js') }}"></script>
 
 <style>
+    #word-entry[hidden], #drawButton[hidden], #ready-btn[hidden] { display: none !important; }
+
     #lobby-container.lobby-shell {
         width: min(820px, calc(100% - 32px));
         max-width: 820px !important;

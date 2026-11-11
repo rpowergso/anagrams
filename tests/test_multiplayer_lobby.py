@@ -28,6 +28,74 @@ class MultiplayerLobbyTests(unittest.TestCase):
         sid_tokens.clear()
         room_bans.clear()
 
+    def test_default_room_settings(self):
+        self.assertEqual(rooms['TEST']['settings'], {
+            'tile_preset': 'bananagrams',
+            'max_tiles': 144,
+            'draw_time': 20,
+            'autodraw_enabled': True,
+            'incorrect_word_penalty': False,
+            'word_winner_draws_next': True,
+            'prefire_enabled': True,
+            'paste_allowed': False,
+            'word_delay': 'balanced',
+        })
+
+    def test_room_word_delay_applies_to_submissions(self):
+        for mode, delay in [('snappy', 0), ('balanced', 0.25), ('classic', 0.75)]:
+            with self.subTest(mode=mode):
+                self.host.emit('update_settings', {'room': 'TEST', 'word_delay': mode})
+                self.host.emit('update_settings', {'room': 'TEST', 'word_delay': []})
+                self.host.emit('start_game', {'room': 'TEST'})
+                game = rooms['TEST']
+                self.assertEqual(game['settings']['word_delay'], mode)
+                game['active_pool'] = list('CAT')
+                with patch.object(socketio, 'sleep') as sleep:
+                    self.host.emit('claim_word', {'room': 'TEST', 'word': 'CAT'})
+                if delay:
+                    sleep.assert_called_once_with(delay)
+                else:
+                    sleep.assert_not_called()
+                self.assertEqual(game['players'][game['host_sid']]['words'], ['CAT'])
+                self.host.emit('vote_end_game', {'room': 'TEST'})
+                self.host.emit('replay_game', {'room': 'TEST'})
+
+    def test_late_joiner_can_watch_and_cannot_play(self):
+        self.host.emit('start_game', {'room': 'TEST'})
+        game = rooms['TEST']
+        guest = socketio.test_client(app)
+        try:
+            guest.emit('join', {
+                'room': 'TEST', 'username': 'Observer', 'reconnect_token': 'observer-token',
+            })
+            [snapshot] = [message['args'][0] for message in guest.get_received()
+                          if message['name'] == 'update_board']
+            self.assertEqual(snapshot['tiles_remaining'], 144)
+            self.assertNotIn('tiles', snapshot)
+            self.assertEqual(game['player_order'], [game['host_sid']])
+
+            game['active_pool'] = list('CAT')
+            guest.emit('claim_word', {'room': 'TEST', 'word': 'CAT'})
+            guest.emit('draw_tile', {'room': 'TEST'})
+            guest.emit('vote_end_game', {'room': 'TEST'})
+            self.assertEqual(game['active_pool'], list('CAT'))
+            self.assertEqual(len(game['tiles']), 144)
+            self.assertFalse(game['end_game_votes'])
+            guest.get_received()
+
+            self.host.emit('draw_tile', {'room': 'TEST'})
+            [snapshot] = [message['args'][0] for message in guest.get_received()
+                          if message['name'] == 'update_board']
+            self.assertEqual(snapshot['tiles_remaining'], 143)
+            self.assertEqual(len(snapshot['active_pool']), 4)
+
+            self.host.emit('vote_end_game', {'room': 'TEST'})
+            guest.emit('replay_game', {'room': 'TEST'})
+            self.assertEqual(game['status'], 'ended')
+            self.assertTrue(any(message['name'] == 'game_ended' for message in guest.get_received()))
+        finally:
+            guest.disconnect()
+
     def test_host_can_add_and_configure_bot(self):
         self.host.emit('add_bot', {'room': 'TEST', 'difficulty': 'easy'})
         bot_sid = next(

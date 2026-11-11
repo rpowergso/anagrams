@@ -1,6 +1,5 @@
 const socket = io();
 let myUsername = getDisplayName();
-let mySid = "";
 let joinedSocketId = "";
 const reconnectStorageKey = `anagramsReconnectToken:${ROOM_ID}`;
 const reconnectToken = localStorage.getItem(reconnectStorageKey) ||
@@ -21,8 +20,9 @@ const boardStealCache = new Map();
 let wordDetailsRequest = 0;
 let gameHasEnded = false;
 let gameInProgress = false;
-let prefireEnabled = false;
-let pasteAllowed = true;
+let prefireEnabled = true;
+let pasteAllowed = false;
+let isSpectator = false;
 let standbyWord = '';
 
 function escapeHtml(value) {
@@ -90,7 +90,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Capture my Socket ID when connected
     socket.on('connect', () => {
-        mySid = socket.id;
         joinCurrentSocket();
     });
 
@@ -109,13 +108,18 @@ function joinCurrentSocket() {
         room: ROOM_ID,
         username: myUsername,
         reconnect_token: reconnectToken,
-        initial_bot_difficulty: INITIAL_BOT_DIFFICULTY
+        initial_bot_difficulty: INITIAL_BOT_DIFFICULTY,
+        observe: isSpectator
     });
 }
 
 socket.on('kicked', (data) => {
     localStorage.removeItem(reconnectStorageKey);
     alert(data.msg || 'The host removed you from this lobby.');
+    window.location.href = '/homepage';
+});
+
+socket.on('room_closed', () => {
     window.location.href = '/homepage';
 });
 
@@ -139,6 +143,7 @@ socket.on('profile_progress', event => anagramsProgress.record(event));
 socket.on('game_ended', (data) => {
     gameHasEnded = true;
     gameInProgress = false;
+    clearInterval(drawTimerInterval);
     showGameOverScreen(data);
 });
 
@@ -151,6 +156,9 @@ socket.on('lobby_update', (data) => {
     
     // Switch visibility if still in lobby
     if (data.status === 'lobby') {
+        isSpectator = !Object.hasOwn(data.players, socket.id);
+        document.getElementById('lobby-spectator-label').hidden = !isSpectator;
+        clearInterval(drawTimerInterval);
         const gameOverModal = document.getElementById('game-over-modal');
         if (gameOverModal) gameOverModal.remove();
         setTopReplayVisible(false);
@@ -168,6 +176,7 @@ socket.on('lobby_update', (data) => {
         unlockTextInput();
         const readyBtn = document.getElementById('ready-btn');
         if (readyBtn) {
+            readyBtn.hidden = isSpectator;
             readyBtn.innerText = 'READY UP';
             readyBtn.style.background = '';
         }
@@ -182,12 +191,6 @@ socket.on('game_start', (data) => {
     setTopReplayVisible(false);
     gameHasEnded = false;
     gameInProgress = true;
-    const lobbyContainer = document.getElementById('lobby-container');
-    const gameContainer = document.getElementById('game-container');
-    
-    if (lobbyContainer) lobbyContainer.style.display = 'none';
-    if (gameContainer) gameContainer.style.display = 'block';
-    
     updateUI(data);
 });
 
@@ -226,6 +229,7 @@ socket.on('player_action', (data) => {
 /* --- ACTIONS --- */
 
 function toggleReady() {
+    if (isSpectator) return;
     playerReadyState = !playerReadyState;
     const readyBtn = document.getElementById('ready-btn');
     if (readyBtn) {
@@ -253,7 +257,8 @@ function updateSettings() {
         incorrect_word_penalty: incorrectWordPenalty,
         word_winner_draws_next: wordWinnerDrawsNext,
         prefire_enabled: prefire,
-        paste_allowed: paste
+        paste_allowed: paste,
+        word_delay: document.getElementById('setting-word-delay').value
     });
 }
 
@@ -293,6 +298,7 @@ function startGame() {
 }
 
 function drawTile() {
+    if (isSpectator) return;
     // The server will validate if it's actually our turn
     socket.emit('draw_tile', { room: ROOM_ID });
     
@@ -303,7 +309,7 @@ function drawTile() {
 
 function submitWord(wordOverride = null) {
     // If locked out during countdown, don't allow submission
-    if (playerLockedOut) {
+    if (isSpectator || playerLockedOut) {
         return;
     }
     
@@ -415,6 +421,9 @@ function renderLobby(data) {
         winnerDrawsInput.disabled = !amIHost;
         prefireInput.disabled = !amIHost;
         pasteInput.disabled = !amIHost;
+        const delayInput = document.getElementById('setting-word-delay');
+        delayInput.value = data.settings.word_delay ?? 'balanced';
+        delayInput.disabled = !amIHost;
     }
 
     // List players
@@ -463,9 +472,17 @@ function renderLobby(data) {
 }
 
 function updateUI(data) {
-    const countEl = document.getElementById('tileCount');
-    if (countEl) countEl.innerText = data.tiles.length;
+    isSpectator = !Object.hasOwn(data.players, socket.id);
+    document.getElementById('lobby-container').style.display = 'none';
+    document.getElementById('game-container').style.display = 'block';
+    document.getElementById('spectator-label').hidden = !isSpectator;
+    document.getElementById('word-entry').hidden = isSpectator;
+    document.getElementById('spectator-action').hidden = !isSpectator;
 
+    const countEl = document.getElementById('tileCount');
+    if (countEl) countEl.innerText = data.tiles_remaining;
+
+    const showFinalScores = data.status === 'ended' && !gameHasEnded;
     gameHasEnded = data.status === 'ended' || gameHasEnded;
     gameInProgress = data.status === 'playing' && !gameHasEnded;
     prefireEnabled = data.settings.prefire_enabled === true;
@@ -481,6 +498,7 @@ function updateUI(data) {
     const turnIndicator = document.getElementById('turn-indicator');
     const drawBtn = document.getElementById('drawButton');
     const endGameBtn = document.getElementById('endGameButton');
+    if (drawBtn) drawBtn.hidden = isSpectator;
     
     if (turnIndicator) {
         const currentName = data.players[currentTurnSid].username;
@@ -489,14 +507,14 @@ function updateUI(data) {
     }
 
     // Show end game button when no tiles left
-    if (data.tiles.length === 0) {
+    if (data.tiles_remaining === 0) {
         if (drawBtn) {
             drawBtn.disabled = true;
             drawBtn.innerText = "NO TILES LEFT";
             drawBtn.style.opacity = "0.5";
         }
         if (endGameBtn) {
-            endGameBtn.style.display = 'inline-block';
+            endGameBtn.style.display = isSpectator ? 'none' : 'inline-block';
             endGameBtn.innerText = hasVotedToEnd ? "END GAME ✓" : "END GAME?";
         }
     } else {
@@ -518,7 +536,13 @@ function updateUI(data) {
         hasVotedToEnd = false;
     }
 
-    resetTurnTimer(data.settings.draw_time, data.settings.autodraw_enabled !== false);
+    resetTurnTimer(data.settings.draw_time, !isSpectator && gameInProgress && data.settings.autodraw_enabled !== false);
+    if (showFinalScores) {
+        const finalScores = Object.fromEntries(
+            Object.entries(data.players).map(([sid, player]) => [sid, player.score])
+        );
+        showGameOverScreen({ final_scores: finalScores, players: data.players });
+    }
     window.setTimeout(focusWordInput, 0);
 }
 
@@ -605,6 +629,7 @@ function renderPlayers(players, playerOrder) {
 }
 
 function requestEndGame() {
+    if (isSpectator) return;
     hasVotedToEnd = true;
     
     // If countdown is active, lock player from typing
@@ -723,7 +748,7 @@ function showGameOverScreen(data) {
                 ${scoresHtml}
             </div>
             <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
-                <button class="btn btn-green" onclick="requestReplay()" style="padding: 15px 40px; font-size: 1.2rem;">PLAY AGAIN</button>
+                ${isSpectator ? '' : '<button class="btn btn-green" onclick="requestReplay()" style="padding: 15px 40px; font-size: 1.2rem;">PLAY AGAIN</button>'}
                 <a href="/homepage" style="text-decoration: none;">
                     <button class="btn btn-leave" style="padding: 15px 40px; font-size: 1.2rem;">BACK TO HOME</button>
                 </a>
@@ -737,6 +762,7 @@ function showGameOverScreen(data) {
 function setTopReplayVisible(visible) {
     const replayButton = document.getElementById('topReplayButton');
     const tileCountDisplay = document.getElementById('tileCountDisplay');
+    visible = visible && !isSpectator;
     if (replayButton) replayButton.hidden = !visible;
     if (tileCountDisplay) tileCountDisplay.hidden = visible;
 }
@@ -919,6 +945,7 @@ function closeBoardWordDefinition() {
 }
 
 function requestReplay() {
+    if (isSpectator) return;
     setTopReplayVisible(false);
     socket.emit('replay_game', { room: ROOM_ID });
 }
@@ -1081,7 +1108,7 @@ function unlockTextInput() {
 function focusWordInput() {
     const input = document.getElementById('wordInput');
     const wordModal = document.getElementById('board-definition-modal');
-    if (!input || input.disabled || !gameInProgress) return;
+    if (!input || input.disabled || isSpectator || !gameInProgress) return;
     if (wordModal && !wordModal.hidden) return;
     if (document.querySelector('.blocking-modal, #game-over-modal, #end-game-countdown')) return;
     input.focus({ preventScroll: true });
@@ -1116,11 +1143,13 @@ function startSilenceTimer(seconds, message) {
 }
 
 function showActionMessage(message) {
-    const msgDiv = document.getElementById('statusMessage');
+    const msgDiv = document.getElementById(isSpectator ? 'spectator-action' : 'statusMessage');
     if (msgDiv) {
         msgDiv.innerText = message;
         msgDiv.style.color = "#f39c12";
-        setTimeout(() => msgDiv.innerText = "", 4000);
+        setTimeout(() => {
+            if (msgDiv.innerText === message) msgDiv.innerText = "";
+        }, 4000);
     }
 }
 
@@ -1132,7 +1161,7 @@ function showReconnectNotice() {
     notice.innerHTML = `
         <div style="max-width:420px;padding:34px;text-align:center;border:2px solid #3498db;border-radius:18px;background:#1a252f;">
             <h2>CONNECTION LOST</h2>
-            <p style="opacity:.75;line-height:1.5;">Your seat is being held. Rejoin with the same name, words, score, and turn position.</p>
+            <p style="opacity:.75;line-height:1.5;">${isSpectator ? 'Trying to reconnect to the game.' : 'Your seat is being held. Rejoin with the same name, words, score, and turn position.'}</p>
             <button id="rejoin-button" class="btn btn-blue" type="button">REJOIN NOW</button>
             <p id="rejoin-status" style="min-height:1.2em;font-size:.82rem;opacity:.7;">Trying automatically…</p>
         </div>`;

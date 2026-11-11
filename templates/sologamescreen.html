@@ -10,6 +10,11 @@
     <div id="tilePool" style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; min-height: 100px; margin-bottom: 30px;"></div>
     <button class="btn btn-blue" onclick="drawTile()">DRAW TILE</button>
     <button class="btn btn-toggle" id="soloAutoBtn" onclick="toggleSoloAuto()">AUTODRAW: OFF</button>
+    <label>WORD DELAY
+        <select id="setting-word-delay">
+            {% include "word_delay_options.html" %}
+        </select>
+    </label>
 </div>
 
 <div style="padding: 0 40px; padding-bottom: 120px;">

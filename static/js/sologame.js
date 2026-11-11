@@ -113,6 +113,8 @@ async function checkWord() {
     input.disabled = true;
 
     try {
+      const delay = Number(document.getElementById('setting-word-delay').selectedOptions[0].dataset.delayMs);
+      if (delay) await new Promise(resolve => window.setTimeout(resolve, delay));
       if (canMakeWord(word, activeTiles)) {
         const response = await fetch('/check-word', {
             method: 'POST',
