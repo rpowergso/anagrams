@@ -1,0 +1,13 @@
+name: Share feedback
+description: Share a suggestion or describe a problem you want to solve.
+body:
+  - type: markdown
+    attributes:
+      value: Feedback is public. Please leave out private links and personal information.
+  - type: textarea
+    id: feedback
+    attributes:
+      label: Feedback or suggestion
+      description: Tell us what you were trying to do and what would make it easier.
+    validations:
+      required: true
